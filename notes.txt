@@ -1,0 +1,21 @@
+roslaunch task4_env task4_env.launch
+rosservice call /navigate "location: x"
+rosservice call /pick "toy_type: y"
+rosservice call /place "{}"
+rosservice call /info "{}"
+
+x: 0-4
+y: ['green','blue','black','red']
+
+
+ROS:
+roslaunch task3_env task3_env.launch
+script -c 'rosrun task3_env my_experiment.py' task3_env/shell.txt
+
+Linux:
+chmod -R +x .
+myfolder_copied_from_wsl>DEL /S /Q *.Identifier
+
+Q:
+1. it faildes going to a location - is the possibility implemented in the navigate?
+2. it did go to a location but stated it failed, is that tolaratable? and after that it fails to pick the object for a few times.
