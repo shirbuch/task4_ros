@@ -206,12 +206,12 @@ def relaunch_skills_server():
     # kill the existing skills_server
     global skills_server_process
     skills_server_process.stop() if skills_server_process else os.system("rosnode kill skills_server_node")
-    rospy.sleep(1)
+    # rospy.sleep(1)
     print("### killed skills_server ###")
     
     # launch the skills_server
     skills_server_process = launch.launch(skills_server_node)
-    rospy.sleep(1)
+    # rospy.sleep(1)
 
     # wait for services launched in server
     print("waiting for services...")
@@ -228,11 +228,8 @@ def reset_env():
 
     # start at the baby
     if not call_navigate(4):
-        rospy.sleep(3)  
-
         # make sure it did not fail
         call_navigate(4)
-        rospy.sleep(3)
 
     # spawn toys and reset counters
     relaunch_skills_server()  
