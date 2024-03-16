@@ -4,6 +4,39 @@ from task4_env.srv import *
 import os
 import roslaunch
 
+
+### Globals ###
+# toy_type options
+GREEN = 'green'
+BLUE = 'blue'
+BLACK = 'black'
+RED = 'red'
+
+given_toys = []
+next_locations = [2, 3, 1]
+navigations_left = 8
+picks_left = 6
+knapsack_toy = None
+
+NAVIGATE0 = 0
+NAVIGATE1 = 1
+NAVIGATE2 = 2
+NAVIGATE3 = 3
+NAVIGATE4 = 4
+PICK = 5
+PLACE = 6
+ACTIONS = [NAVIGATE0, NAVIGATE1, NAVIGATE2, NAVIGATE3, NAVIGATE4, PICK, PLACE]
+
+
+### skills_server node global launcher ###
+skills_server_process = None
+skills_server_node = roslaunch.core.Node("task4_env", "skills_server.py", name="skills_server_node", output='log')
+
+launch = roslaunch.scriptapi.ROSLaunch()
+launch.start()
+
+
+### internal_info parser ###
 def parse_dict(str, key_type="str"):
     parsed_dict = {}
     for keyval in str:
@@ -48,31 +81,21 @@ def parse_state(state_info):
 def parse_info(internal_info):
     state = parse_state(internal_info.split("\n\n")[1][:-1])    
     log = internal_info.split("\n\n")[2][6:-1] # todo: parse log
-    total_rewards = int(internal_info.split("\n\n")[3][14:])
+    total_reward = int(internal_info.split("\n\n")[3][14:])
 
-    return state, log, total_rewards
+    return state, log, total_reward
 
+def get_info():
+    # Usage: state, log, total_reward = get_info()
+    return parse_info(call_info())
 
-########################### CONTROL START ################################3
-# toy_type options
-GREEN = 'green'
-BLUE = 'blue'
-BLACK = 'black'
-RED = 'red'
-TOY_TYPES = [GREEN, BLUE, BLACK, RED]
-
-LOCATION0_TOY_ORDER = [BLUE, BLACK, RED, GREEN]
-LOCATION1_TOY_ORDER = [BLACK, RED, BLUE, GREEN]
-LOCATION2_TOY_ORDER = [GREEN, BLACK, RED, BLUE]
-LOCATION3_TOY_ORDER = [BLACK, RED, BLUE, GREEN]
-LOCATIONS_TOY_ORDERS = [LOCATION0_TOY_ORDER, LOCATION1_TOY_ORDER, LOCATION2_TOY_ORDER, LOCATION3_TOY_ORDER]
-
-navigations_left = 8
-picks_left = 6
-knapsack_toy = None
+def get_holded_toy():
+    state, _, _ = get_info()
+    robot_location, toys_location, locations_toy, toys_reward, holding_toy = state
+    return RED #!!!
 
 
-
+### Service Calls ###
 def call_navigate(location):
     global navigations_left
     try:
@@ -119,99 +142,41 @@ def call_info():
         print("Service call failed: %s"%e)
 
 
-def place_toy_at_baby():
-    if not call_navigate(4):
-        if navigations_left > 0:
-            call_navigate(4)
-        else:
-            return False
+### RL Action Decision ###  
+# todo
+def choose_action():
+    global given_toys
+    global next_locations
     
-    return call_place()
+    return NAVIGATE0 #!!!
 
-def pick_toy(location, given_toys):
-    toy_order = [toy for toy in LOCATIONS_TOY_ORDERS[location] if toy not in given_toys]
-    for toy in toy_order:
-        if picks_left < 1:
-            return None
-        if call_pick(toy):
-            return toy
-    
-    return None
-
-def get_and_pick_toy(location, given_toys):
-    if navigations_left < 2:
-        return None
-
-    if not call_navigate(location):
-        # check if there are enough navigations left for navigating again and to the baby
-        if navigations_left >= 2 and not call_navigate(location) and navigations_left == 2:
-            call_navigate(location)
-        
-    if navigations_left < 1:
-        return None
-
-    return pick_toy(location, given_toys)
-
-def calc_next_location(left_locations):
-    if len(left_locations) == 0:
-        return None
-    
-    if len(left_locations) == 2: # assume locations doesn't include 0
-        if navigations_left == 2:
-            return 2
-        else:
-            return 1
-
-    return left_locations[0]
-
-def reset_control():
-    global knapsack_toy
-    global navigations_left
-    global picks_left
-
-    navigations_left = 8
-    picks_left = 6
-    knapsack_toy = None
+def perform_action(action):
+    if action == NAVIGATE0:
+        call_navigate(0)
+    elif action == NAVIGATE1:
+        call_navigate(1)
+    elif action == NAVIGATE2:
+        call_navigate(2)
+    elif action == NAVIGATE3:
+        call_navigate(3)
+    elif action == NAVIGATE4:
+        call_navigate(4)
+    elif action == PICK:
+        call_pick(get_holded_toy())
+    elif action == PLACE:
+        call_place()
 
 
-def run_control():
-    reset_control()
-
-    given_toys = []
-    next_locations = [2, 3, 1]
-    next_location = next_locations[0]
-    while next_location is not None: 
-        if navigations_left < 2 or picks_left < 1:
-            break
-        toy = get_and_pick_toy(next_location, given_toys)
-        if toy is not None:
-            if place_toy_at_baby():
-                given_toys.append(toy)
-                next_locations.remove(next_location)
-        
-        next_location = calc_next_location(next_locations)
-
-############################ CONTROL END ###############################3
-
-
-############################ EXPERIMENT START ###############################3
-# skills_server node global launcher
-skills_server_process = None
-skills_server_node = roslaunch.core.Node("task4_env", "skills_server.py", name="skills_server_node", output='log')
-
-launch = roslaunch.scriptapi.ROSLaunch()
-launch.start()
-
+### Reset for New Runs ###
 def relaunch_skills_server():
     # kill the existing skills_server
     global skills_server_process
+    
     skills_server_process.stop() if skills_server_process else os.system("rosnode kill skills_server_node")
-    # rospy.sleep(1)
     print("### killed skills_server ###")
     
     # launch the skills_server
     skills_server_process = launch.launch(skills_server_node)
-    # rospy.sleep(1)
 
     # wait for services launched in server
     print("waiting for services...")
@@ -222,9 +187,20 @@ def relaunch_skills_server():
     print("### started skills_server ###")
 
 def reset_env():
+    global given_toys
+    global next_locations
+    global knapsack_toy
+    global navigations_left
+    global picks_left
+
+    given_toys = []
+    next_locations = [2, 3, 1]
+    navigations_left = 8
+    picks_left = 6
+    knapsack_toy = None
+    
+    # Assumes skills_server is already running
     print(f"========== reset env =========")
-    # make sure the navigation is running
-    relaunch_skills_server()
 
     # start at the baby
     if not call_navigate(4):
@@ -232,28 +208,17 @@ def reset_env():
         call_navigate(4)
 
     # spawn toys and reset counters
-    relaunch_skills_server()  
+    relaunch_skills_server()
 
 
-################################
-def print_infos(infos):
-    print("\n\n===============================")
-    print(f"==========INFO SUMMARY=========")
-    print("===============================")
-    for i, info in enumerate(infos):
-        print(f"###\nControl {i+1}:\n###\n")
-        print(info)
-    print("===============================")
-
-# todo validate file path
-def export_infos(infos, average_reward):
-    with open('experiment_output.txt', 'w') as f:
-        for i, info in enumerate(infos):
-            f.write(f"=== Info for expirament {i}:\n{info}\n\n")
-        f.write(f"=== Average reward: {average_reward}\n\n\n")
+### Main Functions ###
+def run_control():
+    action = choose_action()
+    while action is not None:
+        perform_action(action)
+        action = choose_action()
 
 def run_experiment(times=3):
-    infos = []
     total_rewards = []
     for i in range(times):
         reset_env()
@@ -263,32 +228,21 @@ def run_experiment(times=3):
         print("===============================")
         run_control()
         
-        info = call_info()
-        infos.append(info)
-        total_reward = int(info.split("total rewards:")[1])
+        _, _, total_reward = get_info()
         total_rewards.append(total_reward)
         print(f"Total reward: {total_reward}")
         
         print(f"========== Finished {i+1}, Total reward: {total_reward} =========\n\n")
     
-    print_infos(infos)
     average_reward = sum(total_rewards) / len(total_rewards)
     print(f"Average reward: {average_reward}")
 
-    export_infos(infos, average_reward)
-
-
-######################### EXPERIMENT END ##################################3
-
-
 def main():
     relaunch_skills_server()
-    internal_info = call_info()
-    state, log, total_rewards = parse_info(internal_info)
-    
+    state, log, total_reward = get_info()
     pprint.pprint(state)
-    pprint.pprint(log)
-    print(total_rewards)
+    # pprint.pprint(log)
+    # print(total_reward)
 
     run_experiment()
 
