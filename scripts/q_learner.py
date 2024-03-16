@@ -1,4 +1,14 @@
 import pprint
+import rospy
+from task3_env.srv import *
+
+def call_info():
+    try:
+        info_srv = rospy.ServiceProxy('info', info)
+        resp = info_srv()
+        return resp.internal_info
+    except rospy.ServiceException as e:
+        print("Service call failed: %s"%e)
 
 def parse_dict(str, key_type="str"):
     parsed_dict = {}
@@ -50,13 +60,7 @@ def parse_info(internal_info):
     return state, log, total_rewards
     
 if __name__ == '__main__':
-    internal_info = "This is how you get your state and reward info. Also how you determine which toy\
-  \ type to send to the pick request (the one at the robots location).\n\nstate:[robot\
-  \ location:4 toys_location:{'green': 1, 'blue': 0, 'black': 3, 'red': 2} locations_toy:{0:\
-  \ 'blue', 1: 'green', 2: 'red', 3: 'black', 5: 'None'} toys_reward:{'green': 15,\
-  \ 'blue': 20, 'black': 30, 'red': 40} holding_toy:False]\n\nlog:\n[\"listed- action-('place',\
-  \ ), observation:success: False, reward:-3\", \"listed- action-('place', ), observation:success:\
-  \ False, reward:-3\"]\n\ntotal rewards:-6"
+    internal_info = call_info()
     
     state, log, total_rewards = parse_info(internal_info)
     pprint.pprint(state)
