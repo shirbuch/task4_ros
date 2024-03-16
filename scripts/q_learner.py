@@ -13,13 +13,15 @@ def parse_dict(str, key_type="str"):
     
     return parsed_dict
 
-def parse_info(internal_info: str) -> None:
-    state = internal_info.split("\n\n")[1][:-1]
-    state = state.replace("\\", "")
-    state = state.replace(": ", ":")
-    state = state.replace(", ", ",")
+def parse_state(state_info):
+    state_info = internal_info.split("\n\n")[1][:-1]
+    state_info = state_info.replace("\\", "")
+    for i in range(4):
+        state_info = state_info.replace(": ", ":")
+    for i in range(4):
+        state_info = state_info.replace(", ", ",")
 
-    vars = state.split(" ")[1:]
+    vars = [var for var in state_info.split(" ")[1:] if var != ""]
 
     outs = []
     for var in vars:
@@ -37,19 +39,26 @@ def parse_info(internal_info: str) -> None:
     locations_toy = parse_dict(outs[2], key_type="int")
     toys_reward = parse_dict(outs[3])
     holding_toy = bool(outs[4])
-    state = [robot_location, toys_location, locations_toy, toys_reward, holding_toy]
-
-    pprint.pprint(state)
     
-    # log = None
-    # total_rewards = None
+    return [robot_location, toys_location, locations_toy, toys_reward, holding_toy]
 
+def parse_info(internal_info):
+    state = parse_state(internal_info.split("\n\n")[1][:-1])    
+    log = internal_info.split("\n\n")[2][6:-1] # todo: parse log
+    total_rewards = int(internal_info.split("\n\n")[3][14:])
+
+    return state, log, total_rewards
     
 if __name__ == '__main__':
     internal_info = "This is how you get your state and reward info. Also how you determine which toy\
-\ type to send to the pick request (the one at the robots location).\n\nstate:[robot\
-\ location:4 toys_location:{'green': 0, 'blue': 1, 'black': 2, 'red': 3} locations_toy:{0:\
-\ 'green', 1: 'blue', 2: 'black', 3: 'red', 5: 'None'} toys_reward:{'green': 15,\
-\ 'blue': 20, 'black': 30, 'red': 40} holding_toy:False]\n\nlog:\n[]\n\ntotal rewards:0"
+  \ type to send to the pick request (the one at the robots location).\n\nstate:[robot\
+  \ location:4 toys_location:{'green': 1, 'blue': 0, 'black': 3, 'red': 2} locations_toy:{0:\
+  \ 'blue', 1: 'green', 2: 'red', 3: 'black', 5: 'None'} toys_reward:{'green': 15,\
+  \ 'blue': 20, 'black': 30, 'red': 40} holding_toy:False]\n\nlog:\n[\"listed- action-('place',\
+  \ ), observation:success: False, reward:-3\", \"listed- action-('place', ), observation:success:\
+  \ False, reward:-3\"]\n\ntotal rewards:-6"
     
-    parse_info(internal_info)
+    state, log, total_rewards = parse_info(internal_info)
+    pprint.pprint(state)
+    pprint.pprint(log)
+    print(total_rewards)
