@@ -198,7 +198,7 @@ def run_control():
 ############################ EXPERIMENT START ###############################3
 # skills_server node global launcher
 skills_server_process = None
-skills_server_node = roslaunch.core.Node("task4_env", "skills_server.py", name="skills_server_node", output='screen')
+skills_server_node = roslaunch.core.Node("task4_env", "skills_server.py", name="skills_server_node")#, output='screen')
 
 launch = roslaunch.scriptapi.ROSLaunch()
 launch.start()
@@ -207,12 +207,12 @@ def relaunch_skills_server():
     # kill the existing skills_server
     global skills_server_process
     skills_server_process.stop() if skills_server_process else os.system("rosnode kill skills_server_node")
-    rospy.sleep(3)
+    rospy.sleep(1)
     print("### killed skills_server ###")
     
     # launch the skills_server
     skills_server_process = launch.launch(skills_server_node)
-    rospy.sleep(5)
+    rospy.sleep(1)
 
     # wait for services launched in server
     print("waiting for services...")
@@ -286,6 +286,7 @@ def run_experiment(times=3):
 
 
 if __name__ == '__main__':
+    relaunch_skills_server()
     internal_info = call_info()
     state, log, total_rewards = parse_info(internal_info)
     pprint.pprint(state)
