@@ -18,7 +18,6 @@ def parse_dict(str, key_type="str"):
     return parsed_dict
 
 def parse_state(state_info):
-    state_info = internal_info.split("\n\n")[1][:-1]
     state_info = state_info.replace("\\", "")
     for i in range(4):
         state_info = state_info.replace(": ", ":")
@@ -198,7 +197,7 @@ def run_control():
 ############################ EXPERIMENT START ###############################3
 # skills_server node global launcher
 skills_server_process = None
-skills_server_node = roslaunch.core.Node("task4_env", "skills_server.py", name="skills_server_node")#, output='screen')
+skills_server_node = roslaunch.core.Node("task4_env", "skills_server.py", name="skills_server_node", output='log')
 
 launch = roslaunch.scriptapi.ROSLaunch()
 launch.start()
@@ -285,12 +284,22 @@ def run_experiment(times=3):
 ######################### EXPERIMENT END ##################################3
 
 
-if __name__ == '__main__':
+def main():
     relaunch_skills_server()
     internal_info = call_info()
     state, log, total_rewards = parse_info(internal_info)
+    
     pprint.pprint(state)
     pprint.pprint(log)
     print(total_rewards)
 
     run_experiment()
+
+if __name__ == '__main__':
+    try:
+        main()
+    finally:
+        # After Ctrl+C, stop all nodes from running
+        if skills_server_process:
+            skills_server_process.stop()
+
