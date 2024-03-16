@@ -1,14 +1,8 @@
 import pprint
 import rospy
-from task3_env.srv import *
-
-def call_info():
-    try:
-        info_srv = rospy.ServiceProxy('info', info)
-        resp = info_srv()
-        return resp.internal_info
-    except rospy.ServiceException as e:
-        print("Service call failed: %s"%e)
+from task4_env.srv import *
+import os
+import roslaunch
 
 def parse_dict(str, key_type="str"):
     parsed_dict = {}
@@ -60,7 +54,7 @@ def parse_info(internal_info):
     return state, log, total_rewards
 
 
-###########################################################3
+########################### CONTROL START ################################3
 # toy_type options
 GREEN = 'green'
 BLUE = 'blue'
@@ -82,11 +76,10 @@ knapsack_toy = None
 
 def call_navigate(location):
     global navigations_left
-    print(f"Navigating to: {location}")
     try:
         navigate_srv = rospy.ServiceProxy('navigate', navigate)
         resp = navigate_srv(location)
-        print(f"Navigation success (allegedly): {resp.success}")
+        print(f"Navigating to {location}: {resp.success}")
         navigations_left -= 1
         return resp.success
     except rospy.ServiceException as e:
@@ -100,7 +93,7 @@ def call_pick(toy_type):
         resp = pick_srv(toy_type)
         if resp.success:
             knapsack_toy = toy_type
-        print(f"Picking {toy_type} (accurate): {resp.success}")
+        print(f"Picking {toy_type}: {resp.success}")
         picks_left -= 1
         return resp.success
     except rospy.ServiceException as e:
@@ -113,8 +106,16 @@ def call_place():
         resp = place_srv()
         if resp.success:
             knapsack_toy = None
-        print(f"Placing (accurate): {resp.success}")
+        print(f"Placing: {resp.success}")
         return resp.success
+    except rospy.ServiceException as e:
+        print("Service call failed: %s"%e)
+
+def call_info():
+    try:
+        info_srv = rospy.ServiceProxy('info', info)
+        resp = info_srv()
+        return resp.internal_info
     except rospy.ServiceException as e:
         print("Service call failed: %s"%e)
 
@@ -191,7 +192,98 @@ def run_control():
         
         next_location = calc_next_location(next_locations)
 
-###########################################################3
+############################ CONTROL END ###############################3
+
+
+############################ EXPERIMENT START ###############################3
+# skills_server node global launcher
+skills_server_process = None
+skills_server_node = roslaunch.core.Node("task4_env", "skills_server.py", name="skills_server_node", output='screen')
+
+launch = roslaunch.scriptapi.ROSLaunch()
+launch.start()
+
+def relaunch_skills_server():
+    # kill the existing skills_server
+    global skills_server_process
+    skills_server_process.stop() if skills_server_process else os.system("rosnode kill skills_server_node")
+    rospy.sleep(3)
+    print("### killed skills_server ###")
+    
+    # launch the skills_server
+    skills_server_process = launch.launch(skills_server_node)
+    rospy.sleep(5)
+
+    # wait for services launched in server
+    print("waiting for services...")
+    rospy.wait_for_service('info')
+    rospy.wait_for_service('navigate')
+    rospy.wait_for_service('pick')
+    rospy.wait_for_service('place')
+    print("### started skills_server ###")
+
+def reset_env():
+    print(f"========== reset env =========")
+    # make sure the navigation is running
+    relaunch_skills_server()
+
+    # start at the baby
+    if not call_navigate(4):
+        rospy.sleep(3)  
+
+        # make sure it did not fail
+        call_navigate(4)
+        rospy.sleep(3)
+
+    # spawn toys and reset counters
+    relaunch_skills_server()  
+
+
+################################
+def print_infos(infos):
+    print("\n\n===============================")
+    print(f"==========INFO SUMMARY=========")
+    print("===============================")
+    for i, info in enumerate(infos):
+        print(f"###\nControl {i+1}:\n###\n")
+        print(info)
+    print("===============================")
+
+# todo validate file path
+def export_infos(infos, average_reward):
+    with open('experiment_output.txt', 'w') as f:
+        for i, info in enumerate(infos):
+            f.write(f"=== Info for expirament {i}:\n{info}\n\n")
+        f.write(f"=== Average reward: {average_reward}\n\n\n")
+
+def run_experiment(times=3):
+    infos = []
+    total_rewards = []
+    for i in range(times):
+        reset_env()
+
+        print("\n\n===============================")
+        print(f"========== CONTROL {i+1} =========")
+        print("===============================")
+        run_control()
+        
+        info = call_info()
+        infos.append(info)
+        total_reward = int(info.split("total rewards:")[1])
+        total_rewards.append(total_reward)
+        print(f"Total reward: {total_reward}")
+        
+        print(f"========== Finished {i+1}, Total reward: {total_reward} =========\n\n")
+    
+    print_infos(infos)
+    average_reward = sum(total_rewards) / len(total_rewards)
+    print(f"Average reward: {average_reward}")
+
+    export_infos(infos, average_reward)
+
+
+######################### EXPERIMENT END ##################################3
+
 
 if __name__ == '__main__':
     internal_info = call_info()
@@ -200,4 +292,4 @@ if __name__ == '__main__':
     pprint.pprint(log)
     print(total_rewards)
 
-    run_control()
+    run_experiment()
