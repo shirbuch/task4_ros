@@ -38,41 +38,34 @@ TOYS_LOCATIONS = INITIAL_TOYS_LOCATIONS + [BABY_LOCATION, KNAPSACK_LOCATION]
 class State:
     def __init__(self, state):
         self.robot_location = state[ROBOT_LOCATION_INDEX_IN_STATE]
-        toys_location = state[TOYS_LOCATION_INDEX_IN_STATE]
-        self.red_location = toys_location[RED]
-        self.green_location = toys_location[GREEN]
-        self.blue_location = toys_location[BLUE]
-        self.black_location = toys_location[BLACK]
+        self.toys_location = state[TOYS_LOCATION_INDEX_IN_STATE]
     
     def __init__(self, robot_location, red_location, green_location, blue_location, black_location):
         self.robot_location = robot_location
-        self.red_location = red_location
-        self.green_location = green_location
-        self.blue_location = blue_location
-        self.black_location = black_location
+        self.toys_location = {RED: red_location, GREEN: green_location, BLUE: blue_location, BLACK: black_location}
 
     def get_closeby_toy(self):
         if self.robot_location == BABY_LOCATION:
             return None
-        elif self.red_location == self.robot_location:
+        elif self.toys_location[RED] == self.robot_location:
             return RED
-        elif self.green_location == self.robot_location:
+        elif self.toys_location[GREEN] == self.robot_location:
             return GREEN
-        elif self.blue_location == self.robot_location:
+        elif self.toys_location[BLUE] == self.robot_location:
             return BLUE
-        elif self.black_location == self.robot_location:
+        elif self.toys_location[BLACK] == self.robot_location:
             return BLACK
         else:
             return None
 
     def get_holded_toy(self):
-        if self.red_location == KNAPSACK_LOCATION:
+        if self.toys_location[RED] == KNAPSACK_LOCATION:
             return RED
-        elif self.green_location == KNAPSACK_LOCATION:
+        elif self.toys_location[GREEN] == KNAPSACK_LOCATION:
             return GREEN
-        elif self.blue_location == KNAPSACK_LOCATION:
+        elif self.toys_location[BLUE] == KNAPSACK_LOCATION:
             return BLUE
-        elif self.black_location == KNAPSACK_LOCATION:
+        elif self.toys_location[BLACK] == KNAPSACK_LOCATION:
             return BLACK
         else:
             return None
@@ -81,10 +74,10 @@ class State:
         return self.get_holded_toy() is not None
 
     def __str__(self):
-        return f"(Robot: {self.robot_location}, red: {self.red_location}, green: {self.green_location}, blue: {self.blue_location}, black: {self.black_location})"
+        return f"(Robot: {self.robot_location}, red: {self.toys_location[RED]}, green: {self.toys_location[GREEN]}, blue: {self.toys_location[BLUE]}, black: {self.toys_location[BLACK]})"
     
     def print_expanded(self):
-        return f"Robot: {self.robot_location}\nRed: {self.red_location}, Green: {self.green_location}, Blue: {self.blue_location}, Black: {self.black_location}"   
+        return f"Robot: {self.robot_location}\nRed: {self.toys_location[RED]}, Green: {self.toys_location[GREEN]}, Blue: {self.toys_location[BLUE]}, Black: {self.toys_location[BLACK]}"   
 
 
 ### skills_server node global launcher ###
@@ -204,7 +197,7 @@ def call_info():
 ### Q-Learning ###
 def is_valid_state(state: State):
     # Check if the robot is holding at most only one toy
-    toy_locations = [state.red_location, state.green_location, state.blue_location, state.black_location]
+    toy_locations = [state.toys_location[RED], state.toys_location[GREEN], state.toys_location[BLUE], state.toys_location[BLACK]]
     if toy_locations.count(KNAPSACK_LOCATION) > 1:
         return False
 
@@ -237,7 +230,7 @@ def keep_action(state: State, action):
 
         # Check if navigating to an initial toy location with no toy there
         if navigation_target in INITIAL_TOYS_LOCATIONS \
-            and navigation_target not in [state.red_location, state.green_location, state.blue_location, state.black_location]:
+            and navigation_target not in [state.toys_location[RED], state.toys_location[GREEN], state.toys_location[BLUE], state.toys_location[BLACK]]:
             return False
         
         # Check if navigating from one toy to another (doens't make sence to move between toys when Pick will always succeed if there is a toy nearby)
