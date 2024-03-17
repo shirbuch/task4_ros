@@ -43,6 +43,13 @@ class State:
         self.green_location = toys_location[GREEN]
         self.blue_location = toys_location[BLUE]
         self.black_location = toys_location[BLACK]
+    
+    def __init__(self, robot_location, red_location, green_location, blue_location, black_location):
+        self.robot_location = robot_location
+        self.red_location = red_location
+        self.green_location = green_location
+        self.blue_location = blue_location
+        self.black_location = black_location
 
     def get_closeby_toy(self):
         if self.robot_location == BABY_LOCATION:
@@ -71,6 +78,9 @@ class State:
             return None
 
     def __str__(self):
+        return f"(Robot: {self.robot_location}, red: {self.red_location}, green: {self.green_location}, blue: {self.blue_location}, black: {self.black_location})"
+    
+    def print_expanded(self):
         return f"Robot: {self.robot_location}\nRed: {self.red_location}, Green: {self.green_location}, Blue: {self.blue_location}, Black: {self.black_location}"   
 
 
@@ -188,6 +198,48 @@ def call_info():
         print("Service call failed: %s"%e)
 
 
+### Q-Learning ###
+def init_q_table():
+    # Q:SxA --> R
+    # S: state, A: action, R: reward
+    q_table = {}
+    # todo: eliminate bad/unreachable states
+    for robot_location in POSSIBLE_ROBOT_LOCATIONS:
+        for red_location in POSSIBLE_TOYS_LOCATIONS:
+            for green_location in POSSIBLE_TOYS_LOCATIONS:
+                for blue_location in POSSIBLE_TOYS_LOCATIONS:
+                    for black_location in POSSIBLE_TOYS_LOCATIONS:
+                        state = State(robot_location, red_location, green_location, blue_location, black_location)
+                        for action in ACTIONS:
+                            # todo: eliminate bad/unreachable actions
+                            q_table[(state, action)] = 0
+    
+    return q_table
+
+def action_to_string(action):
+    if action == NAVIGATE0:
+        return "Navigate 0"
+    elif action == NAVIGATE1:
+        return "Navigate 1"
+    elif action == NAVIGATE2:
+        return "Navigate 2"
+    elif action == NAVIGATE3:
+        return "Navigate 3"
+    elif action == NAVIGATE4:
+        return "Navigate 4"
+    elif action == PICK:
+        return "Pick      "
+    elif action == PLACE:
+        return "Place     "
+    else:
+        return "None"
+
+def print_q_table(q_table):
+    for state_action, reward in q_table.items():
+        state, action = state_action
+        print(f"{state}, {action_to_string(action)}, Reward: {reward}")
+
+
 ### RL Action Decision ###
 # todo
 def choose_action():
@@ -212,7 +264,7 @@ def perform_action(action):
         call_place()
 
 
-### Reset for New Runs ###
+### Reset environment for New Runs ###
 def relaunch_skills_server():
     # kill the existing skills_server
     global skills_server_process
@@ -249,7 +301,7 @@ def reset_env():
     relaunch_skills_server()
 
 
-### Main Functions ###
+### Experiment Runner ###
 def run_control():
     action = choose_action()
     while action is not None:
@@ -275,7 +327,9 @@ def run_experiment(times=3):
     average_reward = sum(total_rewards) / len(total_rewards)
     print(f"Average reward: {average_reward}")
 
-def main():
+
+### Main Functions ###
+def experiment_main():
     relaunch_skills_server()
     state, log, total_reward = get_info()
     pprint.pprint(state)
@@ -285,6 +339,14 @@ def main():
     print(get_state())
 
     run_experiment()
+
+def q_table_main():
+    q_table = init_q_table()
+    print(q_table.__len__())
+    print_q_table(q_table)
+
+def main():
+    q_table_main()
 
 # todo: get flag of learning or running
 if __name__ == '__main__':
