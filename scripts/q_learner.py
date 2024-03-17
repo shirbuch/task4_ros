@@ -1,4 +1,7 @@
 import pprint
+from tkinter.tix import MAX
+
+from numpy import number
 import rospy
 import os
 import roslaunch
@@ -11,6 +14,9 @@ GREEN = 'green'
 BLUE = 'blue'
 BLACK = 'black'
 RED = 'red'
+
+MAX_NAVIGATIONS = 8
+MAX_PICKS = 6
 
 navigations_left = 8
 picks_left = 6
@@ -212,9 +218,18 @@ def navigation_action_to_location(action):
         return 4
 
 def is_valid_state(state: State):
-    # todo: check if after x navigations/picks something can be a certan way,
-    # maybe by initiating the q_table from initial states and move filling the table based on possible actions instead of eliminationg actions in the air
+    ## Checks by number of moved toys
+    number_of_moved_toys = sum(1 for toy_location in state.toys_location.values() if toy_location not in INITIAL_TOYS_LOCATIONS)
 
+    # Check if the number of moved toys is not the same as the number of used picks
+    if number_of_moved_toys != MAX_PICKS - state.picks_left:
+        return False
+    
+    # Check if the number of moved toys is not possible with the number of used navigations
+    used_navigations = MAX_NAVIGATIONS - state.navigations_left
+    if used_navigations < number_of_moved_toys*2 - 1:
+        return False
+        
     # Check if the robot is holding at most only one toy
     toy_locations = [state.toys_location[RED], state.toys_location[GREEN], state.toys_location[BLUE], state.toys_location[BLACK]]
     if toy_locations.count(KNAPSACK_LOCATION) > 1:
