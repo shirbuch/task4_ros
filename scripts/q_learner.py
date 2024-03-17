@@ -1,11 +1,11 @@
+import datetime
 import pprint
-from tkinter.tix import MAX
-
-from numpy import number
 import rospy
 import os
 import roslaunch
 from task4_env.srv import *
+import pickle
+import time
 
 
 ### Globals ###
@@ -28,7 +28,7 @@ NAVIGATE3 = 3
 NAVIGATE4 = 4
 PICK = 5
 PLACE = 6
-ACTIONS = [NAVIGATE0, NAVIGATE1, NAVIGATE2, NAVIGATE3, NAVIGATE4, PICK, PLACE] # if changing this please update keep_action to convert the navigation actions to 0-4
+ACTIONS = [NAVIGATE0, NAVIGATE1, NAVIGATE2, NAVIGATE3, NAVIGATE4, PICK, PLACE]
 
 ROBOT_LOCATION_INDEX_IN_STATE = 0
 TOYS_LOCATION_INDEX_IN_STATE = 1
@@ -340,10 +340,27 @@ def action_to_string(action):
     else:
         return "None"
 
-def print_q_table(q_table):
+def print_q_table(q_table, skip_printing_factor=500):
+    i = 0
     for state_action, reward in q_table.items():
         state, action = state_action
-        print(f"{state}, {action_to_string(action)}, Reward: {reward}")
+        if i % skip_printing_factor == 0:
+            print(f"{state}, {action_to_string(action)}, Reward: {reward}")
+        i += 1
+
+# todo: change from assuming running from src folder
+def export_q_table(q_table, file_path="task4_env/"):
+    timestamp = datetime.datetime.now().strftime("%d-%m_%H-%M")
+    file_name = file_path + "q_table_" + timestamp + ".pkl"
+
+    with open(file_name, 'wb') as f:
+        pickle.dump(q_table, f)
+    
+    return file_name
+
+def load_q_table(file_name):
+    with open(file_name, 'rb') as f:
+        return pickle.load(f)
 
 
 ### RL Action Decision ###
@@ -446,8 +463,13 @@ def experiment_main():
 
 def q_table_main():
     q_table = init_q_table()
-    # print_q_table(q_table)
+
+    file_name = export_q_table(q_table)
+    q_table = load_q_table(file_name)
+
+    print_q_table(q_table)
     print(q_table.__len__())
+
 
 def main():
     q_table_main()
@@ -460,4 +482,3 @@ if __name__ == '__main__':
         # After Ctrl+C, stop all nodes from running
         if skills_server_process:
             skills_server_process.stop()
-

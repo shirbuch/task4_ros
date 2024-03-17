@@ -1,4 +1,5 @@
 from q_learner import *
+import datetime
 
 ### basic_toy_pick_and_place ###
 def print_info():
@@ -46,4 +47,5 @@ def validate_states_tests():
 
 ### Main ###
 if __name__ == "__main__":
-    validate_states_tests()
+    timestamp = datetime.datetime.now().strftime("%d-%m_%H:%M")
+    print("task4_env/" + "q_table_" + timestamp + ".pkl")
