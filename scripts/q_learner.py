@@ -199,6 +199,18 @@ def call_info():
 
 
 ### Q-Learning ###
+def navigation_action_to_location(action):
+    if action == NAVIGATE0:
+        return 0
+    elif action == NAVIGATE1:
+        return 1
+    elif action == NAVIGATE2:
+        return 2
+    elif action == NAVIGATE3:
+        return 3
+    elif action == NAVIGATE4:
+        return 4
+
 def is_valid_state(state: State):
     # todo: check if after x navigations/picks something can be a certan way,
     # maybe by initiating the q_table from initial states and move filling the table based on possible actions instead of eliminationg actions in the air
@@ -228,13 +240,8 @@ def is_reasonable_action(state: State, action):
             return False
 
         ## Checks about the navigation target
-        navigation_target = action # beware that the navigation actions are 0-4 so currently it collides with the action values
+        navigation_target = navigation_action_to_location(action)
 
-        # When holding a toy, only allow navigating to the baby (as for navigation action)
-        if state.is_holding_toy():
-            return True if navigation_target == BABY_LOCATION else False
-        
-        # Here and on, the robot is not holding a toy, but double check just in case and for if the code structure will change
         # Check if navigating to the baby (without holding a toy)
         if navigation_target == BABY_LOCATION and not state.is_holding_toy():
             return False
@@ -252,18 +259,22 @@ def is_reasonable_action(state: State, action):
         if state.robot_location in INITIAL_TOYS_LOCATIONS and navigation_target in INITIAL_TOYS_LOCATIONS:
             return False
 
+        # When holding a toy, only allow navigating to the baby (as for navigation action)
+        if state.is_holding_toy():
+            return True if navigation_target == BABY_LOCATION else False
+        
     # PICK
     elif action == PICK:
         # Check if there are no more picks left
         if state.picks_left < 1:
             return False
         
-        # Check if the robot is holding a toy
-        if state.is_holding_toy():
-            return False
-
         # Check if the robot is at the baby (duplicated from get_closeby_toy)
         if state.robot_location == BABY_LOCATION:
+            return False
+
+        # Check if the robot is holding a toy
+        if state.is_holding_toy():
             return False
 
         # Check if there is no toy nearby to pick
