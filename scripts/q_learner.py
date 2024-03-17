@@ -36,13 +36,17 @@ TOYS_LOCATIONS = INITIAL_TOYS_LOCATIONS + [BABY_LOCATION, KNAPSACK_LOCATION]
 
 ### State Class ###
 class State:
-    def __init__(self, state):
+    def __init__(self, state, navigations_left=8, picks_left=6):
         self.robot_location = state[ROBOT_LOCATION_INDEX_IN_STATE]
         self.toys_location = state[TOYS_LOCATION_INDEX_IN_STATE]
-    
-    def __init__(self, robot_location, red_location, green_location, blue_location, black_location):
+        self.navigations_left = navigations_left
+        self.picks_left = picks_left
+            
+    def __init__(self, robot_location, red_location, green_location, blue_location, black_location, navigations_left=8, picks_left=6):
         self.robot_location = robot_location
         self.toys_location = {RED: red_location, GREEN: green_location, BLUE: blue_location, BLACK: black_location}
+        self.navigations_left = navigations_left
+        self.picks_left = picks_left
 
     def get_closeby_toy(self):
         if self.robot_location == BABY_LOCATION:
@@ -196,6 +200,9 @@ def call_info():
 
 ### Q-Learning ###
 def is_valid_state(state: State):
+    # todo: check if after x navigations/picks something can be a certan way,
+    # maybe by initiating the q_table from initial states and move filling the table based on possible actions instead of eliminationg actions in the air
+
     # Check if the robot is holding at most only one toy
     toy_locations = [state.toys_location[RED], state.toys_location[GREEN], state.toys_location[BLUE], state.toys_location[BLACK]]
     if toy_locations.count(KNAPSACK_LOCATION) > 1:
@@ -208,11 +215,19 @@ def is_valid_state(state: State):
 
     return True
 
-def keep_action(state: State, action):
-    # todo: maybe add navigations_left and picks_left checks to State and use them here
-
+def is_reasonable_action(state: State, action):
     # NAVIGATE
     if action in [NAVIGATE0, NAVIGATE1, NAVIGATE2, NAVIGATE3, NAVIGATE4]:
+        ## Checks about navigations and picks left
+        # Check if there are no more navigations left
+        if state.navigations_left < 1:
+            return False
+
+        # Check if the robot is at the baby and doesn't have enough navigations/picks to get give the baby another toy (reqires at least 2 navigations and 1 pick)
+        if state.robot_location == BABY_LOCATION and (state.navigations_left < 2 or state.picks_left < 1):
+            return False
+
+        ## Checks about the navigation target
         navigation_target = action # beware that the navigation actions are 0-4 so currently it collides with the action values
 
         # When holding a toy, only allow navigating to the baby (as for navigation action)
@@ -239,6 +254,10 @@ def keep_action(state: State, action):
 
     # PICK
     elif action == PICK:
+        # Check if there are no more picks left
+        if state.picks_left < 1:
+            return False
+        
         # Check if the robot is holding a toy
         if state.is_holding_toy():
             return False
@@ -268,11 +287,13 @@ def init_q_table():
             for green_location in TOYS_LOCATIONS:
                 for blue_location in TOYS_LOCATIONS:
                     for black_location in TOYS_LOCATIONS:
-                        state = State(robot_location, red_location, green_location, blue_location, black_location)
-                        if is_valid_state(state):
-                            for action in ACTIONS:
-                                if keep_action(state, action):
-                                    q_table[(state, action)] = 0
+                        for navigations_left in range(9):
+                            for picks_left in range(7):
+                                state = State(robot_location, red_location, green_location, blue_location, black_location, navigations_left, picks_left)
+                                if is_valid_state(state):
+                                    for action in ACTIONS:
+                                        if is_reasonable_action(state, action):
+                                            q_table[(state, action)] = 0
     return q_table
 
 def action_to_string(action):
@@ -399,7 +420,7 @@ def experiment_main():
 
 def q_table_main():
     q_table = init_q_table()
-    print_q_table(q_table)
+    # print_q_table(q_table)
     print(q_table.__len__())
 
 def main():

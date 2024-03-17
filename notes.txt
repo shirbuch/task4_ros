@@ -43,6 +43,10 @@ internal_info = "This is how you get your state and reward info. Also how you de
 \ 'blue': 20, 'black': 30, 'red': 40} holding_toy:False]\n\nlog:\n[]\n\ntotal rewards:0"
 
 
+q_table size (State with navigations_left and picks_left):
+Optimizations not on navigations_left and picks_left: 178,920
+All optimizations: 148,292
+
 q_table size (State without navigations_left and picks_left):
 No optimizations: 45,000 mas o menos
 State optimizations: 17,535
