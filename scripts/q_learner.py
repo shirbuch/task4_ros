@@ -1,9 +1,8 @@
 import pprint
-from requests import get
 import rospy
-from task4_env.srv import *
 import os
 import roslaunch
+from task4_env.srv import *
 
 
 ### Globals ###
@@ -25,20 +24,21 @@ PICK = 5
 PLACE = 6
 ACTIONS = [NAVIGATE0, NAVIGATE1, NAVIGATE2, NAVIGATE3, NAVIGATE4, PICK, PLACE]
 
-STATE_ROBOT_LOCATION_INDEX = 0
-STATE_TOYS_LOCATION_INDEX = 1
+ROBOT_LOCATION_INDEX_IN_STATE = 0
+TOYS_LOCATION_INDEX_IN_STATE = 1
 
 BABY_LOCATION = 4
 KNAPSACK_LOCATION = 5
-POSSIBLE_ROBOT_LOCATIONS = [0, 1, 2, 3, BABY_LOCATION]
-POSSIBLE_TOYS_LOCATIONS = [0, 1, 2, 3, BABY_LOCATION, KNAPSACK_LOCATION]
+ROBOT_LOCATIONS = [0, 1, 2, 3, BABY_LOCATION]
+INITIAL_TOYS_LOCATIONS = [0, 1, 2, 3]
+TOYS_LOCATIONS = INITIAL_TOYS_LOCATIONS + [BABY_LOCATION, KNAPSACK_LOCATION]
 
 
 ### State Class ###
 class State:
     def __init__(self, state):
-        self.robot_location = state[STATE_ROBOT_LOCATION_INDEX]
-        toys_location = state[STATE_TOYS_LOCATION_INDEX]
+        self.robot_location = state[ROBOT_LOCATION_INDEX_IN_STATE]
+        toys_location = state[TOYS_LOCATION_INDEX_IN_STATE]
         self.red_location = toys_location[RED]
         self.green_location = toys_location[GREEN]
         self.blue_location = toys_location[BLUE]
@@ -199,21 +199,36 @@ def call_info():
 
 
 ### Q-Learning ###
+def is_valid_state(state: State):
+    # Check if the robot is holding at most only one toy
+    toy_locations = [state.red_location, state.green_location, state.blue_location, state.black_location]
+    if toy_locations.count(KNAPSACK_LOCATION) > 1:
+        return False
+
+    # Check if there are no two toys in the same start location
+    toy_locations_in_inital_location = [toy_location for toy_location in toy_locations if toy_location in INITIAL_TOYS_LOCATIONS]
+    if len(set(toy_locations_in_inital_location)) != len(toy_locations_in_inital_location):
+        return False
+
+    return True
+
+def is_valid_action(action):
+    return True # todo
+    
 def init_q_table():
     # Q:SxA --> R
     # S: state, A: action, R: reward
     q_table = {}
-    # todo: eliminate bad/unreachable states
-    for robot_location in POSSIBLE_ROBOT_LOCATIONS:
-        for red_location in POSSIBLE_TOYS_LOCATIONS:
-            for green_location in POSSIBLE_TOYS_LOCATIONS:
-                for blue_location in POSSIBLE_TOYS_LOCATIONS:
-                    for black_location in POSSIBLE_TOYS_LOCATIONS:
+    for robot_location in ROBOT_LOCATIONS:
+        for red_location in TOYS_LOCATIONS:
+            for green_location in TOYS_LOCATIONS:
+                for blue_location in TOYS_LOCATIONS:
+                    for black_location in TOYS_LOCATIONS:
                         state = State(robot_location, red_location, green_location, blue_location, black_location)
-                        for action in ACTIONS:
-                            # todo: eliminate bad/unreachable actions
-                            q_table[(state, action)] = 0
-    
+                        if is_valid_state(state):
+                            for action in ACTIONS:
+                                if is_valid_action(action):
+                                    q_table[(state, action)] = 0
     return q_table
 
 def action_to_string(action):
@@ -243,8 +258,6 @@ def print_q_table(q_table):
 ### RL Action Decision ###
 # todo
 def choose_action():
-    # todo make table of all valid options
-    # todo dont do bad stuff, just eliminate it...
     return PICK #!!!
 
 def perform_action(action):
@@ -342,8 +355,8 @@ def experiment_main():
 
 def q_table_main():
     q_table = init_q_table()
-    print(q_table.__len__())
     print_q_table(q_table)
+    print(q_table.__len__())
 
 def main():
     q_table_main()
