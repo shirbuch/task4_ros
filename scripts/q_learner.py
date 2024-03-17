@@ -22,7 +22,7 @@ NAVIGATE3 = 3
 NAVIGATE4 = 4
 PICK = 5
 PLACE = 6
-ACTIONS = [NAVIGATE0, NAVIGATE1, NAVIGATE2, NAVIGATE3, NAVIGATE4, PICK, PLACE]
+ACTIONS = [NAVIGATE0, NAVIGATE1, NAVIGATE2, NAVIGATE3, NAVIGATE4, PICK, PLACE] # if changing this please update keep_action to convert the navigation actions to 0-4
 
 ROBOT_LOCATION_INDEX_IN_STATE = 0
 TOYS_LOCATION_INDEX_IN_STATE = 1
@@ -76,6 +76,9 @@ class State:
             return BLACK
         else:
             return None
+
+    def is_holding_toy(self):
+        return self.get_holded_toy() is not None
 
     def __str__(self):
         return f"(Robot: {self.robot_location}, red: {self.red_location}, green: {self.green_location}, blue: {self.blue_location}, black: {self.black_location})"
@@ -212,8 +215,46 @@ def is_valid_state(state: State):
 
     return True
 
-def is_valid_action(action):
-    return True # todo
+def keep_action(state: State, action):
+    # todo: maybe add navigations_left and picks_left checks to State and use them here
+
+    # NAVIGATE
+    if action in [NAVIGATE0, NAVIGATE1, NAVIGATE2, NAVIGATE3, NAVIGATE4]:
+        navigation_target = action # beware that the navigation actions are 0-4 so currently it collides with the action values
+
+        # When holding a toy, only allow navigating to the baby (as for navigation action)
+        if state.is_holding_toy():
+            return True if navigation_target == BABY_LOCATION else False
+        
+        # Here and on, the robot is not holding a toy, but double check just in case and for if the code structure will change
+        # Check if navigating to the baby (without holding a toy)
+        if navigation_target == BABY_LOCATION and not state.is_holding_toy():
+            return False
+        
+        # Check if navigating to the same location
+        if navigation_target == state.robot_location:
+            return False
+
+        # Check if navigating to an initial toy location with no toy there
+        if navigation_target in INITIAL_TOYS_LOCATIONS \
+            and navigation_target not in [state.red_location, state.green_location, state.blue_location, state.black_location]:
+            return False
+        
+        # Check if navigating from one toy to another (doens't make sence to move between toys when Pick will always succeed if there is a toy nearby)
+        if state.robot_location in INITIAL_TOYS_LOCATIONS and navigation_target in INITIAL_TOYS_LOCATIONS:
+            return False
+
+    # PICK
+    elif action == PICK:
+        pass # todo
+
+    # PLACE
+    elif action == PLACE:
+        pass # todo
+
+    # Check if the robot is holding a toy and trying to pick another
+    # Check if the robot is at the baby and trying to pick a toy
+    # Check if navigating to the baby while holding a toy
     
 def init_q_table():
     # Q:SxA --> R
@@ -227,7 +268,7 @@ def init_q_table():
                         state = State(robot_location, red_location, green_location, blue_location, black_location)
                         if is_valid_state(state):
                             for action in ACTIONS:
-                                if is_valid_action(action):
+                                if keep_action(state, action):
                                     q_table[(state, action)] = 0
     return q_table
 
