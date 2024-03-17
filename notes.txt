@@ -1,4 +1,7 @@
 roslaunch task4_env task4_env.launch
+python task4_env/scripts/q_learner.py 
+python task4_env/scripts/scripting.py
+
 rosservice call /navigate "location: x"
 rosservice call /pick "toy_type: y"
 rosservice call /place "{}"
@@ -7,6 +10,37 @@ rosservice call /info "{}"
 x: 0-4
 y: ['green','blue','black','red']
 
+
+Another way to stop the run:
+rosnode kill skills_server_node
+
+parsed state:
+[4,
+ {'black': 2, 'blue': 1, 'green': 0, 'red': 3},
+ {0: 'green', 1: 'blue', 2: 'black', 3: 'red', 5: 'None'},
+ {'black': 30, 'blue': 20, 'green': 15, 'red': 40},
+ True]
+
+###
+state:
+[robot location:4 
+toys_location:{'green': 0, 'blue': 1, 'black': 2, 'red': 3} 
+locations_toy:{0: 'green', 1: 'blue', 2: 'black', 3: 'red', 5: 'None'} 
+toys_reward:{'green': 15, 'blue': 20, 'black': 30, 'red': 40} 
+holding_toy:False]
+
+log:
+[]
+
+total rewards:
+0
+###
+
+internal_info = "This is how you get your state and reward info. Also how you determine which toy\
+\ type to send to the pick request (the one at the robots location).\n\nstate:[robot\
+\ location:4 toys_location:{'green': 0, 'blue': 1, 'black': 2, 'red': 3} locations_toy:{0:\
+\ 'green', 1: 'blue', 2: 'black', 3: 'red', 5: 'None'} toys_reward:{'green': 15,\
+\ 'blue': 20, 'black': 30, 'red': 40} holding_toy:False]\n\nlog:\n[]\n\ntotal rewards:0"
 
 ROS:
 roslaunch task3_env task3_env.launch

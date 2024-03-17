@@ -1,4 +1,5 @@
 import pprint
+from requests import get
 import rospy
 from task4_env.srv import *
 import os
@@ -12,11 +13,8 @@ BLUE = 'blue'
 BLACK = 'black'
 RED = 'red'
 
-given_toys = []
-next_locations = [2, 3, 1]
 navigations_left = 8
 picks_left = 6
-knapsack_toy = None
 
 NAVIGATE0 = 0
 NAVIGATE1 = 1
@@ -26,6 +24,54 @@ NAVIGATE4 = 4
 PICK = 5
 PLACE = 6
 ACTIONS = [NAVIGATE0, NAVIGATE1, NAVIGATE2, NAVIGATE3, NAVIGATE4, PICK, PLACE]
+
+STATE_ROBOT_LOCATION_INDEX = 0
+STATE_TOYS_LOCATION_INDEX = 1
+
+BABY_LOCATION = 4
+KNAPSACK_LOCATION = 5
+POSSIBLE_ROBOT_LOCATIONS = [0, 1, 2, 3, BABY_LOCATION]
+POSSIBLE_TOYS_LOCATIONS = [0, 1, 2, 3, BABY_LOCATION, KNAPSACK_LOCATION]
+
+
+### State Class ###
+class State:
+    def __init__(self, state):
+        self.robot_location = state[STATE_ROBOT_LOCATION_INDEX]
+        toys_location = state[STATE_TOYS_LOCATION_INDEX]
+        self.red_location = toys_location[RED]
+        self.green_location = toys_location[GREEN]
+        self.blue_location = toys_location[BLUE]
+        self.black_location = toys_location[BLACK]
+
+    def get_closeby_toy(self):
+        if self.robot_location == BABY_LOCATION:
+            return None
+        elif self.red_location == self.robot_location:
+            return RED
+        elif self.green_location == self.robot_location:
+            return GREEN
+        elif self.blue_location == self.robot_location:
+            return BLUE
+        elif self.black_location == self.robot_location:
+            return BLACK
+        else:
+            return None
+
+    def get_holded_toy(self):
+        if self.red_location == KNAPSACK_LOCATION:
+            return RED
+        elif self.green_location == KNAPSACK_LOCATION:
+            return GREEN
+        elif self.blue_location == KNAPSACK_LOCATION:
+            return BLUE
+        elif self.black_location == KNAPSACK_LOCATION:
+            return BLACK
+        else:
+            return None
+
+    def __str__(self):
+        return f"Robot: {self.robot_location}\nRed: {self.red_location}, Green: {self.green_location}, Blue: {self.blue_location}, Black: {self.black_location}"   
 
 
 ### skills_server node global launcher ###
@@ -89,32 +135,35 @@ def get_info():
     # Usage: state, log, total_reward = get_info()
     return parse_info(call_info())
 
-def get_holded_toy():
+def get_state() -> State:
     state, _, _ = get_info()
-    robot_location, toys_location, locations_toy, toys_reward, holding_toy = state
-    return RED #!!!
+    return State(state)
 
 
 ### Service Calls ###
+# Dumb, that is they do not check if the action is possible to execute but only wrapper for node call #
 def call_navigate(location):
     global navigations_left
     try:
+        print(f"Navigating to {location}: ", end =" ")
         navigate_srv = rospy.ServiceProxy('navigate', navigate)
         resp = navigate_srv(location)
-        print(f"Navigating to {location}: {resp.success}")
         navigations_left -= 1
+        print(resp.success)
         return resp.success
     except rospy.ServiceException as e:
         print("Service call failed: %s"%e)
 
-def call_pick(toy_type):
-    global knapsack_toy
+def call_pick():
     global picks_left
     try:
+        toy_type = get_state().get_closeby_toy()
+        if toy_type is None:
+            print("No toy to pick")
+            return False
+
         pick_srv = rospy.ServiceProxy('pick', pick)
         resp = pick_srv(toy_type)
-        if resp.success:
-            knapsack_toy = toy_type
         print(f"Picking {toy_type}: {resp.success}")
         picks_left -= 1
         return resp.success
@@ -122,12 +171,9 @@ def call_pick(toy_type):
         print("Service call failed: %s"%e)
 
 def call_place():
-    global knapsack_toy
     try:
         place_srv = rospy.ServiceProxy('place', place)
         resp = place_srv()
-        if resp.success:
-            knapsack_toy = None
         print(f"Placing: {resp.success}")
         return resp.success
     except rospy.ServiceException as e:
@@ -142,13 +188,12 @@ def call_info():
         print("Service call failed: %s"%e)
 
 
-### RL Action Decision ###  
+### RL Action Decision ###
 # todo
 def choose_action():
-    global given_toys
-    global next_locations
-    
-    return NAVIGATE0 #!!!
+    # todo make table of all valid options
+    # todo dont do bad stuff, just eliminate it...
+    return PICK #!!!
 
 def perform_action(action):
     if action == NAVIGATE0:
@@ -162,7 +207,7 @@ def perform_action(action):
     elif action == NAVIGATE4:
         call_navigate(4)
     elif action == PICK:
-        call_pick(get_holded_toy())
+        call_pick()
     elif action == PLACE:
         call_place()
 
@@ -187,17 +232,10 @@ def relaunch_skills_server():
     print("### started skills_server ###")
 
 def reset_env():
-    global given_toys
-    global next_locations
-    global knapsack_toy
     global navigations_left
     global picks_left
-
-    given_toys = []
-    next_locations = [2, 3, 1]
     navigations_left = 8
     picks_left = 6
-    knapsack_toy = None
     
     # Assumes skills_server is already running
     print(f"========== reset env =========")
@@ -244,8 +282,11 @@ def main():
     # pprint.pprint(log)
     # print(total_reward)
 
+    print(get_state())
+
     run_experiment()
 
+# todo: get flag of learning or running
 if __name__ == '__main__':
     try:
         main()
