@@ -46,7 +46,8 @@ internal_info = "This is how you get your state and reward info. Also how you de
 q_table size (State without navigations_left and picks_left):
 No optimizations: 45,000 mas o menos
 State optimizations: 17,535
-State and Navigation action optimizations: 1,460
+State and Navigation action optimizations: 7,014
+State and action optimizations: 2,840
 
 
 ROS:

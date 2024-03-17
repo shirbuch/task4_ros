@@ -246,15 +246,25 @@ def keep_action(state: State, action):
 
     # PICK
     elif action == PICK:
-        pass # todo
+        # Check if the robot is holding a toy
+        if state.is_holding_toy():
+            return False
+
+        # Check if the robot is at the baby (duplicated from get_closeby_toy)
+        if state.robot_location == BABY_LOCATION:
+            return False
+
+        # Check if there is no toy nearby to pick
+        if state.get_closeby_toy() is None:
+            return False
 
     # PLACE
     elif action == PLACE:
-        pass # todo
-
-    # Check if the robot is holding a toy and trying to pick another
-    # Check if the robot is at the baby and trying to pick a toy
-    # Check if navigating to the baby while holding a toy
+        # Check if the robot is not at the baby and holding a toy
+        if state.robot_location != BABY_LOCATION or not state.is_holding_toy():
+            return False
+    
+    return True
     
 def init_q_table():
     # Q:SxA --> R
