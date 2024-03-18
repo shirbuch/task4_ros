@@ -389,12 +389,13 @@ class Info:
 
 ### Q-Learning ###
 class QTable:
-    def __init__(self, file_name=None): # future: change file
+    def __init__(self, file_name=None):
         if file_name is None:
             self.q_table = QTable.create_initial_q_table()
         else:
-            # todo: check if this works good
-            with open(file_name, 'rb') as f:
+            file_dir="task4_env/q_tables/"  # future: change file_dir from assuming running from src folder
+            file_path = file_dir + file_name
+            with open(file_path, 'rb') as f:
                 self.q_table = pickle.load(f)
 
     @staticmethod
@@ -447,21 +448,32 @@ class QTable:
                 state_records[state_action.copy()] = reward
         return state_records
     
-    # future: change from assuming running from src folder
-    def export(self, filename=None, file_path="task4_env/q_tables/"):
-        if filename is None:
-            filename = datetime.datetime.now().strftime("%d-%m_%H-%M")
-        file = file_path + "q_table_" + filename + ".pkl"
+    def get_updated_records(self):
+        updated_records = {}
+        for state_action, reward in self.q_table.items():
+            if reward != 0:
+                updated_records[state_action.copy()] = reward
+        return updated_records
+    
+    @staticmethod
+    def generate_file_name():
+        return "q_table_" + datetime.datetime.now().strftime("%d-%m_%H-%M") + ".pkl"
+    
+    def export(self, file_name=None):
+        if file_name is None:
+            file_name = QTable.generate_file_name()
+        file_dir="task4_env/q_tables/" # future: change from assuming running from src folder
+        file_path = file_dir + file_name
 
-        with open(file, 'wb') as f:
+        with open(file_path, 'wb') as f:
             pickle.dump(self.q_table, f)
         
-        return file
+        return file_path
 
     def update(self, state: State, action: Action, reward: int):
         self.q_table[StateAction(state, action)] = reward
     
-# todo: todo
+# todo: all
 class QAlgorithm:
     @staticmethod
     def choose_next_action(state: State, q_table: QTable, print_options=False) -> Action:
@@ -481,10 +493,12 @@ class QAlgorithm:
 
 ### Experiment Runner ###
 class ExperimentRunner:
-    def __init__(self, learning_mode=False):
+    def __init__(self, learning_mode=False, import_file_name=None, export_file_name=None, export_rate=1): # future: change file name
         self.learning_mode = learning_mode
-        self.q_table = QTable() # todo: update based on learning_mode
-        self.iterations = 3 # if learning_mode else 10 # todo: update
+        self.q_table = QTable(import_file_name) # future: check if learning_mode means starting with empty q_table
+        self.export_file_name = export_file_name if export_file_name else QTable.generate_file_name()
+        self.iterations = 3 # if learning_mode else 10 # future: update
+        self.export_rate = export_rate # Export the q_table once every 'export_rate' iterations
 
     def reset_env(self):
         # Assumes skills_server is already running
@@ -511,7 +525,7 @@ class ExperimentRunner:
             if self.learning_mode:
                 total_reward = Info.get_total_reward()
                 self.q_table.update(state, action, total_reward)
-                print(f"Updated: State: {state}, Action: {action}, Reward: {total_reward}") # todo: deleteme
+                # print(f"Updated: State: {state}, Action: {action}, Reward: {total_reward}") # future: deleteme
 
             state, action = self.get_state_and_next_action()
 
@@ -534,20 +548,24 @@ class ExperimentRunner:
             if not self.learning_mode:
                 total_reward = Info.get_total_reward()
                 total_rewards.append(total_reward)
+                
+                print(f"\nFinal state: {Info.get_state()}")
                 print(f"========== Finished {i+1}, Total reward: {total_reward} =========\n\n")
 
-            # todo: export q_table once in a while
+            # Export q_table once every 'self.export_rate' iterations
+            if self.learning_mode and i % self.export_rate == 0:
+                file_path = self.q_table.export(self.export_file_name)
+                print(f"Re-exported table to: {file_path}")
         
         print(f"\n\n========== Finished All =========")
         if not self.learning_mode:
             average_reward = sum(total_rewards) / len(total_rewards)
             print(f"Average reward: {average_reward}\n")
-        print(f"Final state: {Info.get_state()}\n\n")
         
-        # Export q_table
+        # Export the final q_table
         if self.learning_mode:
-            filename = self.q_table.export()
-            print(f"Q-table exported to: {filename}\n\n")
+            file_path = self.q_table.export(self.export_file_name)
+            print(f"Q-table exported to: {file_path}\n\n")
 
 # Skill Server #
 class SkillsServer:

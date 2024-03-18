@@ -64,11 +64,20 @@ def see_state_records_before_and_after_nav():
 
     print(q_table.q_table.__len__())
 
+### q_table load and export ###
+def create_initial_q_table_and_export():
+    q_table = QTable()
+    q_table.export("initial_q_table.pkl")
+
+def load_q_table_and_print(file_name="initial_q_table.pkl"):
+    q_table = QTable(file_name)
+    q_table.print(100)
+
+def load_q_table_and_print_only_updated_records(file_name):
+    q_table = QTable(file_name)
+    QTable.print_q_table_formated_dict(q_table.get_updated_records())
+
 ### Main ###
 if __name__ == "__main__":
-    # file_name = "task4_env/q_tables/important/q_table_13560.pkl"
-    # q_table = QTable(file_name)
-    # q_table.print()
-    # print(q_table.q_table.__len__())
-
-    see_state_records_before_and_after_nav()
+    file_name = "one_iteration_q_table.pkl"
+    load_q_table_and_print_only_updated_records(file_name)
