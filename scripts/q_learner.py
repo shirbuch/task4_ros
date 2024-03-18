@@ -334,7 +334,7 @@ class Info:
         
         return parsed_dict
 
-    def parse_state(state_info) -> State:
+    def parse_state(state_info):
         state_info = state_info.replace("\\", "")
         for i in range(4):
             state_info = state_info.replace(": ", ":")
@@ -360,26 +360,30 @@ class Info:
         toys_reward = Info.parse_dict(outs[3])
         holding_toy = bool(outs[4])
 
-        return State(robot_location, toys_location, Info.navigations_left, Info.picks_left)
+        return State(robot_location, toys_location, Info.navigations_left, Info.picks_left), toys_reward
 
     def parse_info(internal_info):
-        state = Info.parse_state(internal_info.split("\n\n")[1][:-1])    
+        state, toys_reward = Info.parse_state(internal_info.split("\n\n")[1][:-1])    
         log = internal_info.split("\n\n")[2][6:-1] # backlog: parse log
         total_reward = int(internal_info.split("\n\n")[3][14:])
 
-        return state, log, total_reward
+        return state, log, total_reward, toys_reward
 
     def get_info():
-        # Usage: state, log, total_reward = Info.get_info()
+        # Usage: state, log, total_reward, toys_reward = Info.get_info()
         return Info.parse_info(ServiceCalls.call_info())
 
     def get_state() -> State:
-        state, _, _ = Info.get_info()
+        state, _, _, _ = Info.get_info()
         return state
     
     def get_total_reward():
-        _, _, total_reward = Info.get_info()
+        _, _, total_reward, _ = Info.get_info()
         return total_reward
+
+    def get_toys_reward():
+        _, _, _, toys_reward = Info.get_info()
+        return toys_reward
 
 
 ### Q-Learning ###
@@ -503,6 +507,9 @@ class ExperimentRunner:
             print("\n\n===============================")
             print(f"========== CONTROL {i+1} =========")
             print("===============================")
+            print(f"Initial state: {Info.get_state()}")
+            print(f"Toys rewards: {Info.get_toys_reward()}")
+
             ExperimentRunner.run_control()
             
             total_reward = Info.get_total_reward()
@@ -548,9 +555,6 @@ class SkillsServer:
 ### Main Functions ###
 def experiment_main():
     SkillsServer.relaunch()
-
-    print(Info.get_state())
-
     ExperimentRunner.run_experiment()
 
 def q_table_main():
