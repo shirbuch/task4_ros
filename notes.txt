@@ -1,3 +1,4 @@
+roslaunch task4_env task4_env.launch > /dev/null 2>&1
 roslaunch task4_env task4_env.launch
 python task4_env/scripts/q_learner.py 
 python task4_env/scripts/scripting.py
@@ -14,7 +15,7 @@ y: ['green','blue','black','red']
 Another way to stop the run:
 rosnode kill skills_server_node
 
-
+todo:
 todo
 future
 backlog
