@@ -1,6 +1,7 @@
 import datetime
 import pprint
 import random
+import sys
 import rospy
 import os
 import roslaunch
@@ -457,6 +458,15 @@ class QTable:
         
         return file
    
+    # todo
+    # todo: save table each 5 minutes
+    def q_learn():
+        q_table = QTable() # todo: get from file
+        print(q_table.__len__())
+
+        # QLearning.print_q_table(q_table)
+        print(q_table.__len__())
+    
 class RLActionDecision:
     def choose_next_action(state: State, q_table: QTable) -> Action:
         state = Info.get_state()
@@ -499,7 +509,9 @@ class ExperimentRunner:
             action = RLActionDecision.choose_next_action(state, q_table)
 
     @staticmethod
-    def run_experiment(times=3):
+    def run_experiment(times=10):
+        SkillsServer.relaunch()
+
         total_rewards = []
         for i in range(times):
             ExperimentRunner.reset_env()
@@ -552,23 +564,20 @@ class SkillsServer:
         SkillsServer.launch()
 
 
-### Main Functions ###
-def experiment_main():
-    SkillsServer.relaunch()
-    ExperimentRunner.run_experiment()
-
-def q_table_main():
-    q_table = QTable()
-    print(q_table.__len__())
-
-    # QLearning.print_q_table(q_table)
-    print(q_table.__len__())
-
+### Main ###
 def main():
-    experiment_main()
-    # q_table_main()
+    try:
+        learning_mode = bool(int(sys.argv[1]))
+    except:
+        print("Please provide learning mode flag (0/1) as an argument.")
+        return
+    
+    print(f"\n\n##### {'LEARNING' if learning_mode else 'EXECUTING'} #####\n\n")
+    if learning_mode:
+        QTable.q_learn()
+    else:
+        ExperimentRunner.run_experiment()
 
-# future: get flag of learning or running
 if __name__ == '__main__':
     try:
         main()
