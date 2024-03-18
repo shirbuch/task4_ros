@@ -177,6 +177,10 @@ class State:
         if len(set(toy_locations_in_inital_location)) != len(toy_locations_in_inital_location):
             return False
 
+        # Check if the robot is at a toy and has all navigations left
+        if self.robot_location != Locations.BABY_LOCATION and self.navigations_left == State.MAX_NAVIGATIONS:
+            return False
+
         return True
 
     def is_reasonable_to_perform_action(self, action: Action):
@@ -221,6 +225,10 @@ class State:
             if self.picks_left < 1:
                 return False
             
+            # Check if there are no navigations left to deliver the picked toy
+            if self.navigations_left < 1:
+                return False
+
             # Check if the robot is at the baby (duplicated from get_closeby_toy)
             if self.robot_location == Locations.BABY_LOCATION:
                 return False
