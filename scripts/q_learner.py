@@ -412,7 +412,7 @@ class QTable:
                     print(f"{state_action.state}, {state_action.action}, Reward: {reward}")
                 elif what_to_print == "state":
                     print(f"{state_action.state}")
-                elif what_to_print == "action":
+                elif what_to_print == "action_reward":
                     print(f"{state_action.action}, Reward: {reward}")
             i += 1
     
@@ -457,26 +457,23 @@ class QTable:
             pickle.dump(self.q_table, f)
         
         return file
-   
-    # todo
-    # todo: save table each 5 minutes
-    def q_learn():
-        q_table = QTable() # todo: get from file
-        print(q_table.__len__())
 
-        # QLearning.print_q_table(q_table)
-        print(q_table.__len__())
+    def update(self, state: State, action: Action, reward: int):
+        self.q_table[StateAction(state, action)] = reward
     
-class RLActionDecision:
-    def choose_next_action(state: State, q_table: QTable) -> Action:
-        state = Info.get_state()
+# todo: todo
+class QAlgorithm:
+    @staticmethod
+    def choose_next_action(state: State, q_table: QTable, print_options=False) -> Action:
         state_records = q_table.get_state_records(state)
+
+        if print_options:
+            print(f"\nState: {state}\nOptions:")
+            QTable.print_q_table_formated_dict(state_records, what_to_print="action_reward")
         
-        # todo: choose action based on calculations
-        print(f"\nState: {state}\nOptions:")
-        QTable.print_q_table_formated_dict(state_records, what_to_print="action")
         if state_records:
-            state_action, reward = random.choice(list(state_records.items()))
+            # todo: choose action based on calculations
+            state_action, _ = random.choice(list(state_records.items()))
             return state_action.action
         else:
             return None
@@ -484,8 +481,12 @@ class RLActionDecision:
 
 ### Experiment Runner ###
 class ExperimentRunner:
-    @staticmethod
-    def reset_env():
+    def __init__(self, learning_mode=False):
+        self.learning_mode = learning_mode
+        self.q_table = QTable() # todo: update based on learning_mode
+        self.iterations = 3 # if learning_mode else 10 # todo: update
+
+    def reset_env(self):
         # Assumes skills_server is already running
         print(f"========== reset env =========")
 
@@ -498,40 +499,55 @@ class ExperimentRunner:
         SkillsServer.relaunch()
         Info.reset()
 
-    @staticmethod
-    def run_control(): 
+    def get_state_and_next_action(self):
         state = Info.get_state()
-        q_table = QTable()
-        action = RLActionDecision.choose_next_action(state, q_table)
+        return state, QAlgorithm.choose_next_action(state, self.q_table, print_options = not self.learning_mode)
+    
+    def run_control(self): 
+        state, action = self.get_state_and_next_action()
         while action is not None:
             action.perform()
-            state = Info.get_state()
-            action = RLActionDecision.choose_next_action(state, q_table)
 
-    @staticmethod
-    def run_experiment(times=10):
+            if self.learning_mode:
+                total_reward = Info.get_total_reward()
+                self.q_table.update(state, action, total_reward)
+                print(f"Updated: State: {state}, Action: {action}, Reward: {total_reward}") # todo: deleteme
+
+            state, action = self.get_state_and_next_action()
+
+    def run_experiment(self):
         SkillsServer.relaunch()
 
         total_rewards = []
-        for i in range(times):
-            ExperimentRunner.reset_env()
+        for i in range(self.iterations):
+            self.reset_env()
 
-            print("\n\n===============================")
-            print(f"========== CONTROL {i+1} =========")
-            print("===============================")
-            print(f"Initial state: {Info.get_state()}")
-            print(f"Toys rewards: {Info.get_toys_reward()}")
+            if not self.learning_mode:
+                print("\n\n===============================")
+                print(f"========== CONTROL {i+1} =========")
+                print("===============================")
+                print(f"Initial state: {Info.get_state()}")
+                print(f"Toys rewards: {Info.get_toys_reward()}")
 
-            ExperimentRunner.run_control()
+            self.run_control()
             
-            total_reward = Info.get_total_reward()
-            total_rewards.append(total_reward)
-            print(f"Total reward: {total_reward}")
-            
-            print(f"========== Finished {i+1}, Total reward: {total_reward} =========\n\n")
+            if not self.learning_mode:
+                total_reward = Info.get_total_reward()
+                total_rewards.append(total_reward)
+                print(f"========== Finished {i+1}, Total reward: {total_reward} =========\n\n")
+
+            # todo: export q_table once in a while
         
-        average_reward = sum(total_rewards) / len(total_rewards)
-        print(f"Average reward: {average_reward}")
+        print(f"\n\n========== Finished All =========")
+        if not self.learning_mode:
+            average_reward = sum(total_rewards) / len(total_rewards)
+            print(f"Average reward: {average_reward}\n")
+        print(f"Final state: {Info.get_state()}\n\n")
+        
+        # Export q_table
+        if self.learning_mode:
+            filename = self.q_table.export()
+            print(f"Q-table exported to: {filename}\n\n")
 
 # Skill Server #
 class SkillsServer:
@@ -544,19 +560,16 @@ class SkillsServer:
     def kill():
         SkillsServer.PROCESS = None  # Define the "skills_server_process" variable
         SkillsServer.PROCESS.stop() if SkillsServer.PROCESS else os.system("rosnode kill skills_server_node")
-        print("### killed skills_server ###")
     
     @staticmethod
     def launch():
         SkillsServer.LAUNCH.launch(SkillsServer.NODE)
         
         # wait for services launched in server
-        print("waiting for services...")
         rospy.wait_for_service('info')
         rospy.wait_for_service('navigate')
         rospy.wait_for_service('pick')
         rospy.wait_for_service('place')
-        print("### started skills_server ###")
 
     @staticmethod
     def relaunch():
@@ -573,10 +586,9 @@ def main():
         return
     
     print(f"\n\n##### {'LEARNING' if learning_mode else 'EXECUTING'} #####\n\n")
-    if learning_mode:
-        QTable.q_learn()
-    else:
-        ExperimentRunner.run_experiment()
+
+    experimentRunner = ExperimentRunner(learning_mode)
+    experimentRunner.run_experiment()
 
 if __name__ == '__main__':
     try:
