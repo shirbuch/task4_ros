@@ -1,6 +1,5 @@
 import datetime
 import pprint
-import stat
 import rospy
 import os
 import roslaunch
@@ -347,12 +346,13 @@ class Info:
 
 ### Q-Learning ###
 class QTable:
-    def __init__(self, file=None): # todo: change file
-        if file is None:
+    def __init__(self, file_name=None): # todo: change file
+        if file_name is None:
             self.q_table = QTable.create_initial_q_table()
         else:
-            self.q_table = self.load(file)
-            
+            with open(file_name, 'rb') as f:
+                self.q_table = pickle.load(f)
+
     def print(self, skip_printing_factor=1000):
         i = 0
         for state_action, reward in self.q_table.items():
@@ -393,11 +393,7 @@ class QTable:
             pickle.dump(self.q_table, f)
         
         return file
-
-    def load(self, file_name):
-        with open(file_name, 'rb') as f:
-            self.q_table = pickle.load(f)
-
+   
 class RLActionDecision:
     def choose_next_action(state: State, q_table: QTable) -> Action:
         state = Info.get_state()
