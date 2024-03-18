@@ -14,6 +14,12 @@ y: ['green','blue','black','red']
 Another way to stop the run:
 rosnode kill skills_server_node
 
+
+todo
+future
+backlog
+
+
 parsed state:
 [4,
  {'black': 2, 'blue': 1, 'green': 0, 'red': 3},

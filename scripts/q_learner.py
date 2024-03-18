@@ -1,5 +1,6 @@
 import datetime
 import pprint
+import random
 import rospy
 import os
 import roslaunch
@@ -113,7 +114,7 @@ class State:
     def copy(self):
         return State(self.robot_location, self.toys_location.copy(), self.navigations_left, self.picks_left)
 
-    # todo: check if this is correct
+    # backlog: check if this is correct
     def __hash__(self):
         return hash((self.robot_location, tuple(self.toys_location.values())))
     
@@ -362,7 +363,7 @@ class Info:
 
     def parse_info(internal_info):
         state = Info.parse_state(internal_info.split("\n\n")[1][:-1])    
-        log = internal_info.split("\n\n")[2][6:-1] # todo: parse log
+        log = internal_info.split("\n\n")[2][6:-1] # backlog: parse log
         total_reward = int(internal_info.split("\n\n")[3][14:])
 
         return state, log, total_reward
@@ -382,21 +383,31 @@ class Info:
 
 ### Q-Learning ###
 class QTable:
-    def __init__(self, file_name=None): # todo: change file
+    def __init__(self, file_name=None): # future: change file
         if file_name is None:
             self.q_table = QTable.create_initial_q_table()
         else:
+            # todo: check if this works good
             with open(file_name, 'rb') as f:
                 self.q_table = pickle.load(f)
 
     @staticmethod
-    def print_q_table_formated_dict(q_table_formated_dict: dict, skip_printing_factor=1):
+    def print_q_table_formated_dict(q_table_formated_dict: dict, skip_printing_factor=1, what_to_print="all"):
+        if not q_table_formated_dict:
+            print("None\n")
+            return
+        
         if skip_printing_factor < 1:
             skip_printing_factor = 1
         i = 0
         for state_action, reward in q_table_formated_dict.items():
             if i % skip_printing_factor == 0:
-                print(f"{state_action.state}, {state_action.action}, Reward: {reward}")
+                if what_to_print == "all":
+                    print(f"{state_action.state}, {state_action.action}, Reward: {reward}")
+                elif what_to_print == "state":
+                    print(f"{state_action.state}")
+                elif what_to_print == "action":
+                    print(f"{state_action.action}, Reward: {reward}")
             i += 1
     
     def print(self, skip_printing_factor=1000):
@@ -429,7 +440,7 @@ class QTable:
                 state_records[state_action.copy()] = reward
         return state_records
     
-    # todo: change from assuming running from src folder
+    # future: change from assuming running from src folder
     def export(self, filename=None, file_path="task4_env/q_tables/"):
         if filename is None:
             filename = datetime.datetime.now().strftime("%d-%m_%H-%M")
@@ -444,9 +455,15 @@ class RLActionDecision:
     def choose_next_action(state: State, q_table: QTable) -> Action:
         state = Info.get_state()
         state_records = q_table.get_state_records(state)
-        pprint.pprint(state_records)
+        
         # todo: choose action based on calculations
-        return state_records[0].action if state_records else None
+        print(f"\nState: {state}\nOptions:")
+        QTable.print_q_table_formated_dict(state_records, what_to_print="action")
+        if state_records:
+            state_action, reward = random.choice(list(state_records.items()))
+            return state_action.action
+        else:
+            return None
 
 
 ### Experiment Runner ###
@@ -545,7 +562,7 @@ def main():
     experiment_main()
     # q_table_main()
 
-# todo: get flag of learning or running
+# future: get flag of learning or running
 if __name__ == '__main__':
     try:
         main()
