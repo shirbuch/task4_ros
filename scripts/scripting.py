@@ -1,25 +1,24 @@
 from q_learner import *
-import datetime
 
 ### basic_toy_pick_and_place ###
 def print_info():
-    state, log, total_reward = get_info()
+    state, log, total_reward = Info.get_info()
     # pprint.pprint(state)
     # pprint.pprint(log)
-    # print(total_reward)
+    print(total_reward)
 
-    print(get_state())
+    print(Info.get_state())
 
 def basic_toy_pick(location=1):
-    call_navigate(location)
-    call_pick()
+    ServiceCalls.call_navigate(location)
+    ServiceCalls.call_pick()
 
 def place_toy_at_baby():
-    call_navigate(BABY_LOCATION)
-    call_place()
+    ServiceCalls.call_navigate(Locations.BABY_LOCATION)
+    ServiceCalls.call_place()
 
 def basic_toy_pick_and_place():
-    relaunch_skills_server()
+    SkillsServer.relaunch()
     print_info()
     basic_toy_pick()
     print_info()
@@ -47,5 +46,4 @@ def validate_states_tests():
 
 ### Main ###
 if __name__ == "__main__":
-    timestamp = datetime.datetime.now().strftime("%d-%m_%H:%M")
-    print("task4_env/" + "q_table_" + timestamp + ".pkl")
+    basic_toy_pick_and_place()
