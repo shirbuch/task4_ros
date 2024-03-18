@@ -53,6 +53,9 @@ class Action:
         else:
             return "None"
 
+    def copy(self):
+        return Action(self.action_id)
+    
     def is_navigation(self):
         return self.action_id in Action.NAVIGATION_ACTIONS
     
@@ -79,9 +82,9 @@ class Action:
     def perform(self) -> bool:
         if self.is_navigation():
             return ServiceCalls.call_navigate(self.get_location_of_navigation_action())
-        elif self.action_id == Action.PICK:
+        elif self.is_pick():
             return ServiceCalls.call_pick()
-        elif self.action_id == Action.PLACE:
+        elif self.is_place():
             return ServiceCalls.call_place()
     
 class State:
@@ -92,17 +95,23 @@ class State:
     def toy_locations_to_dict(red_location, green_location, blue_location, black_location):
         return {ToyTypes.RED: red_location, ToyTypes.GREEN: green_location, ToyTypes.BLUE: blue_location, ToyTypes.BLACK: black_location}
 
-    def __init__(self, robot_location, toys_location, navigations_left=8, picks_left=6):
+    def __init__(self, robot_location, toys_location, navigations_left=MAX_NAVIGATIONS, picks_left=MAX_PICKS):
         self.robot_location = robot_location
         self.toys_location = toys_location
         self.navigations_left = navigations_left
         self.picks_left = picks_left
       
     def __str__(self):
-        return f"(Robot: {self.robot_location}, red: {self.toys_location[ToyTypes.RED]}, green: {self.toys_location[ToyTypes.GREEN]}, blue: {self.toys_location[ToyTypes.BLUE]}, black: {self.toys_location[ToyTypes.BLACK]})"
+        return f"(Robot: {self.robot_location}, red: {self.toys_location[ToyTypes.RED]}, green: {self.toys_location[ToyTypes.GREEN]}, blue: {self.toys_location[ToyTypes.BLUE]}, black: {self.toys_location[ToyTypes.BLACK]}, navigations left: {self.navigations_left}, picks left: {self.picks_left})"
 
     def __eq__(self, other):
-        return self.robot_location == other.robot_location and self.toys_location == other.toys_location
+        return self.robot_location == other.robot_location and \
+            self.toys_location == other.toys_location and \
+            self.navigations_left == other.navigations_left and \
+            self.picks_left == other.picks_left
+
+    def copy(self):
+        return State(self.robot_location, self.toys_location.copy(), self.navigations_left, self.picks_left)
 
     # todo: check if this is correct
     def __hash__(self):
@@ -243,6 +252,8 @@ class StateAction:
     def __hash__(self):
         return hash((self.state, self.action))
 
+    def copy(self):
+        return StateAction(self.state.copy(), self.action.copy())
 
 ### Service Calls ###
 class ServiceCalls:
@@ -253,6 +264,7 @@ class ServiceCalls:
             navigate_srv = rospy.ServiceProxy('navigate', navigate)
             resp = navigate_srv(location)
             print(resp.success)
+            Info.navigations_left -= 1
             return resp.success
         except rospy.ServiceException as e:
             print("Service call failed: %s"%e)
@@ -267,6 +279,7 @@ class ServiceCalls:
             pick_srv = rospy.ServiceProxy('pick', pick)
             resp = pick_srv(toy_type)
             print(f"Picking {toy_type}: {resp.success}")
+            Info.picks_left -= 1
             return resp.success
         except rospy.ServiceException as e:
             print("Service call failed: %s"%e)
@@ -290,6 +303,14 @@ class ServiceCalls:
 
 # internal_info caller and parser #
 class Info:
+    navigations_left = State.MAX_NAVIGATIONS
+    picks_left = State.MAX_PICKS
+
+    @staticmethod
+    def reset():
+        Info.navigations_left = State.MAX_NAVIGATIONS
+        Info.picks_left = State.MAX_PICKS
+
     def parse_dict(str, key_type="str"):
         parsed_dict = {}
         for keyval in str:
@@ -329,7 +350,7 @@ class Info:
         toys_reward = Info.parse_dict(outs[3])
         holding_toy = bool(outs[4])
 
-        return State(robot_location, toys_location)
+        return State(robot_location, toys_location, Info.navigations_left, Info.picks_left)
 
     def parse_info(internal_info):
         state = Info.parse_state(internal_info.split("\n\n")[1][:-1])    
@@ -360,12 +381,18 @@ class QTable:
             with open(file_name, 'rb') as f:
                 self.q_table = pickle.load(f)
 
-    def print(self, skip_printing_factor=1000):
+    @staticmethod
+    def print_q_table_formated_dict(q_table_formated_dict: dict, skip_printing_factor=1):
+        if skip_printing_factor < 1:
+            skip_printing_factor = 1
         i = 0
-        for state_action, reward in self.q_table.items():
+        for state_action, reward in q_table_formated_dict.items():
             if i % skip_printing_factor == 0:
                 print(f"{state_action.state}, {state_action.action}, Reward: {reward}")
             i += 1
+    
+    def print(self, skip_printing_factor=1000):
+        QTable.print_q_table_formated_dict(self.q_table, skip_printing_factor)
 
     @staticmethod
     def create_initial_q_table():
@@ -391,7 +418,7 @@ class QTable:
         state_records = {}
         for state_action, reward in self.q_table.items():
             if state_action.state == state:
-                state_records[state_action] = reward
+                state_records[state_action.copy()] = reward
         return state_records
     
     # todo: change from assuming running from src folder
@@ -420,6 +447,7 @@ class ExperimentRunner:
     def reset_env():
         # Assumes skills_server is already running
         print(f"========== reset env =========")
+        Info.reset()
 
         # Spawn toys and start at the baby
         if not ServiceCalls.call_navigate(4):

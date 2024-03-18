@@ -25,7 +25,6 @@ def basic_toy_pick_and_place():
     place_toy_at_baby()
     print_info()
 
-
 ### q_table ###
 def test_state(state, is_valid):
     print(state)
@@ -44,6 +43,27 @@ def validate_states_tests():
     state = State(BABY_LOCATION, 0, 0, 2, KNAPSACK_LOCATION)
     test_state(state, False)
 
+def see_state_records_before_and_after_nav():
+    q_table = QTable()
+
+    ExperimentRunner.reset_env()
+
+    print("\n\nBefore nav")
+    state = Info.get_state()
+    print(state)
+    state_records = q_table.get_state_records(state)
+    QTable.print_q_table_formated_dict(state_records)
+
+    ServiceCalls.call_navigate(1)
+    
+    print("\n\nAfter nav")    
+    state = Info.get_state()
+    print(state)
+    state_records = q_table.get_state_records(state)
+    QTable.print_q_table_formated_dict(state_records)
+
+    print(q_table.q_table.__len__())
+
 ### Main ###
 if __name__ == "__main__":
     # file_name = "task4_env/q_tables/important/q_table_13560.pkl"
@@ -51,12 +71,4 @@ if __name__ == "__main__":
     # q_table.print()
     # print(q_table.q_table.__len__())
 
-
-    q_table = QTable()
-    state = Info.get_state()
-    print(state)
-
-    state_records = q_table.get_state_records(state)
-    for state_action, reward in state_records.items():
-        print(f"{state_action.state}, {state_action.action}, Reward: {reward}")
-    
+    see_state_records_before_and_after_nav()
