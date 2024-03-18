@@ -104,6 +104,10 @@ class State:
     def __eq__(self, other):
         return self.robot_location == other.robot_location and self.toys_location == other.toys_location
 
+    # todo: check if this is correct
+    def __hash__(self):
+        return hash((self.robot_location, tuple(self.toys_location.values())))
+    
     def get_closeby_toy(self):
         if self.robot_location == Locations.BABY_LOCATION:
             return None
@@ -384,8 +388,12 @@ class QTable:
         return q_table
     
     def get_state_records(self, state: State):
-        return {state_action: reward for state_action, reward in self.q_table.items() if state_action.state == state}
-
+        state_records = {}
+        for state_action, reward in self.q_table.items():
+            if state_action.state == state:
+                state_records[state_action] = reward
+        return state_records
+    
     # todo: change from assuming running from src folder
     def export(self, filename=None, file_path="task4_env/q_tables/"):
         if filename is None:
