@@ -32,58 +32,52 @@ class Action:
     NAVIGATION_ACTIONS = [NAVIGATE0, NAVIGATE1, NAVIGATE2, NAVIGATE3, NAVIGATE4]
     ALL_ACTIONS = NAVIGATION_ACTIONS + [PICK, PLACE]
 
-    def __init__(self, action):
-        self.action = action
+    def __init__(self, action_id):
+        self.action_id = action_id
 
-    def get_location_of_navigation_action(self):
-        if self.action == Action.NAVIGATE0:
-            return 0
-        elif self.action == Action.NAVIGATE1:
-            return 1
-        elif self.action == Action.NAVIGATE2:
-            return 2
-        elif self.action == Action.NAVIGATE3:
-            return 3
-        elif self.action == Action.NAVIGATE4:
-            return 4
-    
     def __str__(self):
-        if self.action == Action.NAVIGATE0:
+        if self.action_id == Action.NAVIGATE0:
             return "Navigate 0"
-        elif self.action == Action.NAVIGATE1:
+        elif self.action_id == Action.NAVIGATE1:
             return "Navigate 1"
-        elif self.action == Action.NAVIGATE2:
+        elif self.action_id == Action.NAVIGATE2:
             return "Navigate 2"
-        elif self.action == Action.NAVIGATE3:
+        elif self.action_id == Action.NAVIGATE3:
             return "Navigate 3"
-        elif self.action == Action.NAVIGATE4:
+        elif self.action_id == Action.NAVIGATE4:
             return "Navigate 4"
-        elif self.action == Action.PICK:
+        elif self.action_id == Action.PICK:
             return "Pick      "
-        elif self.action == Action.PLACE:
+        elif self.action_id == Action.PLACE:
             return "Place     "
         else:
             return "None"
 
-    def perform(self):
-        if self.action == Action.NAVIGATE0:
-            ServiceCalls.call_navigate(0)
-        elif self.action == Action.NAVIGATE1:
-            ServiceCalls.call_navigate(1)
-        elif self.action == Action.NAVIGATE2:
-            ServiceCalls.call_navigate(2)
-        elif self.action == Action.NAVIGATE3:
-            ServiceCalls.call_navigate(3)
-        elif self.action == Action.NAVIGATE4:
-            ServiceCalls.call_navigate(4)
-        elif self.action == Action.PICK:
-            ServiceCalls.call_pick()
-        elif self.action == Action.PLACE:
-            ServiceCalls.call_place()
-
     def is_navigation(self):
-        return self.action in Action.NAVIGATION_ACTIONS
+        return self.action_id in Action.NAVIGATION_ACTIONS
 
+    def get_location_of_navigation_action(self):
+        if self.action_id == Action.NAVIGATE0:
+            return 0
+        elif self.action_id == Action.NAVIGATE1:
+            return 1
+        elif self.action_id == Action.NAVIGATE2:
+            return 2
+        elif self.action_id == Action.NAVIGATE3:
+            return 3
+        elif self.action_id == Action.NAVIGATE4:
+            return 4
+        else:
+            return None
+    
+    def perform(self) -> bool:
+        if self.is_navigation():
+            return ServiceCalls.call_navigate(self.get_location_of_navigation_action())
+        elif self.action_id == Action.PICK:
+            return ServiceCalls.call_pick()
+        elif self.action_id == Action.PLACE:
+            return ServiceCalls.call_place()
+    
 class State:
     MAX_NAVIGATIONS = 8
     MAX_PICKS = 6
@@ -242,7 +236,7 @@ class ServiceCalls:
     # Dumb, that is they do not check if the action is possible to execute but only wrapper for node call #
     def call_navigate(location):
         try:
-            print(f"Navigating to {location}: ", end =" ")
+            print(f"Navigating to {location}: ", end ="")
             navigate_srv = rospy.ServiceProxy('navigate', navigate)
             resp = navigate_srv(location)
             print(resp.success)
@@ -409,10 +403,14 @@ class ExperimentRunner:
 
     @staticmethod
     def run_control():
-        action = RLActionDecision.choose_next_action()
-        while action is not None:
-            action.perform()
-            action = RLActionDecision.choose_next_action()
+        for action in [Action(Action.NAVIGATE0), Action(Action.PICK), Action(Action.NAVIGATE4), Action(Action.PLACE)]:
+            if not action.perform():
+                action.perform()
+        
+        # action = RLActionDecision.choose_next_action()
+        # while action is not None:
+        #     action.perform()
+        #     action = RLActionDecision.choose_next_action()
 
     @staticmethod
     def run_experiment(times=3):
@@ -484,8 +482,8 @@ def q_table_main():
     print(q_table.__len__())
 
 def main():
-    # experiment_main()
-    q_table_main()
+    experiment_main()
+    # q_table_main()
 
 # todo: get flag of learning or running
 if __name__ == '__main__':
