@@ -184,72 +184,6 @@ class State:
 
         return True
 
-    def is_reasonable_to_perform_action(self, action: Action):
-        # NAVIGATE
-        if action.is_navigation():
-            ## Checks about navigations and picks left
-            # Check if there are no more navigations left
-            if self.navigations_left < 1:
-                return False
-
-            # Check if the robot is at the baby and doesn't have enough navigations/picks to get give the baby another toy (reqires at least 2 navigations and 1 pick)
-            if self.robot_location == Locations.BABY_LOCATION and (self.navigations_left < 2 or self.picks_left < 1):
-                return False
-
-            ## Checks about the navigation target
-            navigation_target = action.get_location_of_navigation_action()
-
-            # Check if navigating to the baby (without holding a toy)
-            if navigation_target == Locations.BABY_LOCATION and not self.is_holding_toy():
-                return False
-            
-            # Check if navigating to the same location
-            if navigation_target == self.robot_location:
-                return False
-
-            # Check if navigating to an initial toy location with no toy there
-            if navigation_target in Locations.INITIAL_TOYS_LOCATIONS \
-                and navigation_target not in self.get_toys_location_list():
-                return False
-            
-            # Check if navigating from one toy to another (doens't make sence to move between toys when Pick will always succeed if there is a toy nearby)
-            if self.robot_location in Locations.INITIAL_TOYS_LOCATIONS and navigation_target in Locations.INITIAL_TOYS_LOCATIONS:
-                return False
-
-            # When holding a toy, only allow navigating to the baby (as for navigation action)
-            if self.is_holding_toy() and navigation_target != Locations.BABY_LOCATION:
-                return False
-        
-        # Actions.PICK
-        elif action.is_pick():
-            # Check if there are no more picks left
-            if self.picks_left < 1:
-                return False
-            
-            # Check if there are no navigations left to deliver the picked toy
-            if self.navigations_left < 1:
-                return False
-
-            # Check if the robot is at the baby (duplicated from get_closeby_toy)
-            if self.robot_location == Locations.BABY_LOCATION:
-                return False
-
-            # Check if the robot is holding a toy
-            if self.is_holding_toy():
-                return False
-
-            # Check if there is no toy nearby to pick
-            if self.get_closeby_toy() is None:
-                return False
-
-        # Actions.PLACE
-        elif action.is_place():
-            # Check if the robot is not at the baby and holding a toy
-            if self.robot_location != Locations.BABY_LOCATION or not self.is_holding_toy():
-                return False
-        
-        return True
-
 class StateAction:
     def __init__(self, state: State, action: Action):
         self.state = state
@@ -263,6 +197,73 @@ class StateAction:
 
     def copy(self):
         return StateAction(self.state.copy(), self.action.copy())
+
+    def is_reasonable(self):
+        # NAVIGATE
+        if self.action.is_navigation():
+            ## Checks about navigations and picks left
+            # Check if there are no more navigations left
+            if self.state.navigations_left < 1:
+                return False
+
+            # Check if the robot is at the baby and doesn't have enough navigations/picks to get give the baby another toy (reqires at least 2 navigations and 1 pick)
+            if self.state.robot_location == Locations.BABY_LOCATION and (self.state.navigations_left < 2 or self.state.picks_left < 1):
+                return False
+
+            ## Checks about the navigation target
+            navigation_target = self.action.get_location_of_navigation_action()
+
+            # Check if navigating to the baby (without holding a toy)
+            if navigation_target == Locations.BABY_LOCATION and not self.state.is_holding_toy():
+                return False
+            
+            # Check if navigating to the same location
+            if navigation_target == self.state.robot_location:
+                return False
+
+            # Check if navigating to an initial toy location with no toy there
+            if navigation_target in Locations.INITIAL_TOYS_LOCATIONS \
+                and navigation_target not in self.state.get_toys_location_list():
+                return False
+            
+            # Check if navigating from one toy to another (doens't make sence to move between toys when Pick will always succeed if there is a toy nearby)
+            if self.state.robot_location in Locations.INITIAL_TOYS_LOCATIONS and navigation_target in Locations.INITIAL_TOYS_LOCATIONS:
+                return False
+
+            # When holding a toy, only allow navigating to the baby (as for navigation action)
+            if self.state.is_holding_toy() and navigation_target != Locations.BABY_LOCATION:
+                return False
+        
+        # Actions.PICK
+        elif self.action.is_pick():
+            # Check if there are no more picks left
+            if self.state.picks_left < 1:
+                return False
+            
+            # Check if there are no navigations left to deliver the picked toy
+            if self.state.navigations_left < 1:
+                return False
+
+            # Check if the robot is at the baby (duplicated from get_closeby_toy)
+            if self.state.robot_location == Locations.BABY_LOCATION:
+                return False
+
+            # Check if the robot is holding a toy
+            if self.state.is_holding_toy():
+                return False
+
+            # Check if there is no toy nearby to pick
+            if self.state.get_closeby_toy() is None:
+                return False
+
+        # Actions.PLACE
+        elif self.action.is_place():
+            # Check if the robot is not at the baby and holding a toy
+            if self.state.robot_location != Locations.BABY_LOCATION or not self.state.is_holding_toy():
+                return False
+        
+        return True
+
 
 ### Service Calls ###
 class ServiceCalls:
@@ -429,8 +430,9 @@ class QTable:
                                     if state.is_valid():
                                         for action_num in Action.ALL_ACTIONS:
                                             action = Action(action_num)
-                                            if state.is_reasonable_to_perform_action(action):
-                                                q_table[StateAction(state, action)] = 0
+                                            state_action = StateAction(state, action)
+                                            if state_action.is_reasonable():
+                                                q_table[state_action] = 0
         return q_table
     
     def get_state_records(self, state: State):
@@ -472,7 +474,6 @@ class ExperimentRunner:
     def reset_env():
         # Assumes skills_server is already running
         print(f"========== reset env =========")
-        Info.reset()
 
         # Spawn toys and start at the baby
         if not ServiceCalls.call_navigate(4):
@@ -481,6 +482,7 @@ class ExperimentRunner:
 
         # Reset counters
         SkillsServer.relaunch()
+        Info.reset()
 
     @staticmethod
     def run_control(): 
