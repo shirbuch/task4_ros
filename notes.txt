@@ -45,8 +45,7 @@ internal_info = "This is how you get your state and reward info. Also how you de
 
 q_table size (State with navigations_left and picks_left):
 Optimizations not on navigations_left and picks_left: 178,920
-All optimizations: 136,028 -> 15,096
-After changing all code to classes(???): 42,308 -> 39,476
+All optimizations: 136,028 -> 15,096 -> 13,560
 
 q_table size (State without navigations_left and picks_left):
 No optimizations: 45,000 mas o menos

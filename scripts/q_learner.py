@@ -56,6 +56,12 @@ class Action:
 
     def is_navigation(self):
         return self.action_id in Action.NAVIGATION_ACTIONS
+    
+    def is_pick(self):
+        return self.action_id == Action.PICK
+    
+    def is_place(self):
+        return self.action_id == Action.PLACE
 
     def get_location_of_navigation_action(self):
         if self.action_id == Action.NAVIGATE0:
@@ -193,9 +199,9 @@ class State:
             # When holding a toy, only allow navigating to the baby (as for navigation action)
             if self.is_holding_toy() and navigation_target != Locations.BABY_LOCATION:
                 return False
-            
+        
         # Actions.PICK
-        elif action == Action.PICK:
+        elif action.is_pick():
             # Check if there are no more picks left
             if self.picks_left < 1:
                 return False
@@ -213,7 +219,7 @@ class State:
                 return False
 
         # Actions.PLACE
-        elif action == Action.PLACE:
+        elif action.is_place():
             # Check if the robot is not at the baby and holding a toy
             if self.robot_location != Locations.BABY_LOCATION or not self.is_holding_toy():
                 return False
@@ -378,14 +384,15 @@ class QTable:
         return {state_action: reward for state_action, reward in self.q_table.items() if state_action.state == state}
 
     # todo: change from assuming running from src folder
-    def export(self, file_path="task4_env/q_tables/"):
-        timestamp = datetime.datetime.now().strftime("%d-%m_%H-%M")
-        file_name = file_path + "q_table_" + timestamp + ".pkl"
+    def export(self, filename=None, file_path="task4_env/q_tables/"):
+        if filename is None:
+            filename = datetime.datetime.now().strftime("%d-%m_%H-%M")
+        file = file_path + "q_table_" + filename + ".pkl"
 
-        with open(file_name, 'wb') as f:
+        with open(file, 'wb') as f:
             pickle.dump(self.q_table, f)
         
-        return file_name
+        return file
 
     def load(self, file_name):
         with open(file_name, 'rb') as f:

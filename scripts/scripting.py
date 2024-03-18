@@ -52,7 +52,9 @@ if __name__ == "__main__":
     q_table = QTable()
 
     q_table.print()
+    print(q_table.q_table.__len__())
 
+    q_table.export("13560")
 
     # q_table = QTable()
     # print(q_table)
