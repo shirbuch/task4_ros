@@ -2,6 +2,7 @@ import datetime
 import pprint
 import random
 import sys
+from typing import Dict, Tuple
 import rospy
 import os
 import roslaunch
@@ -9,7 +10,7 @@ from task4_env.srv import *
 import pickle
 
 
-### State ###
+### Constants ###
 class Locations:
     BABY_LOCATION = 4
     KNAPSACK_LOCATION = 5
@@ -23,6 +24,8 @@ class ToyTypes:
     BLUE = 'blue'
     BLACK = 'black'
 
+
+### Classes ###
 class Action:
     NAVIGATE0 = 0
     NAVIGATE1 = 1
@@ -55,6 +58,12 @@ class Action:
         else:
             return "None"
 
+    def __hash__(self):
+        return hash(self.action_id)  
+    
+    def __eq__(self, other):
+        return self.action_id == other.action_id
+    
     def copy(self):
         return Action(self.action_id)
     
@@ -81,18 +90,24 @@ class Action:
         else:
             return None
     
-    def perform(self) -> bool:
+    def perform(self, skills_server) -> bool:
         if self.is_navigation():
-            return ServiceCalls.call_navigate(self.get_location_of_navigation_action())
+            return skills_server.navigate(self.get_location_of_navigation_action())
         elif self.is_pick():
-            return ServiceCalls.call_pick()
+            toy_type = skills_server.get_info().state.get_closeby_toy()
+            if toy_type is None:
+                print("No toy to pick")
+                return False
+
+            return skills_server.pick(toy_type)
         elif self.is_place():
-            return ServiceCalls.call_place()
+            return skills_server.place()
     
 class State:
+    # Beware! duplicated from SkillsServer because of future declerations
     MAX_NAVIGATIONS = 8
     MAX_PICKS = 6
-    
+
     @staticmethod
     def toy_locations_to_dict(red_location, green_location, blue_location, black_location):
         return {ToyTypes.RED: red_location, ToyTypes.GREEN: green_location, ToyTypes.BLUE: blue_location, ToyTypes.BLACK: black_location}
@@ -115,7 +130,6 @@ class State:
     def copy(self):
         return State(self.robot_location, self.toys_location.copy(), self.navigations_left, self.picks_left)
 
-    # backlog: check if this is correct
     def __hash__(self):
         return hash((self.robot_location, tuple(self.toys_location.values())))
     
@@ -156,25 +170,25 @@ class State:
 
     def get_used_navigations(self):
         return State.MAX_NAVIGATIONS - self.navigations_left
-  
+    
     def is_valid(self):
         ## Checks by number of moved toys
         number_of_moved_toys = sum(1 for toy_location in self.get_toys_location_list() if toy_location not in Locations.INITIAL_TOYS_LOCATIONS)
 
-        # Check if the number of moved toys is not the same as the number of used picks
+        # Check if the number of moved toys is not the same as the number of used picks (pick always succeeds if there is a toy nearby)
         if number_of_moved_toys != self.get_used_picks():
             return False
         
         # Check if the number of moved toys is not possible with the number of used navigations
         if self.get_used_navigations() < number_of_moved_toys*2 - 1:
             return False
-            
-        # Check if the robot is holding at most only one toy
+        
+        # Check if the robot is holding more than one toy
         toy_locations = self.get_toys_location_list()
         if toy_locations.count(Locations.KNAPSACK_LOCATION) > 1:
             return False
 
-        # Check if there are no two toys in the same start location
+        # Check if there are two toys in the same start location
         toy_locations_in_inital_location = [toy_location for toy_location in toy_locations if toy_location in Locations.INITIAL_TOYS_LOCATIONS]
         if len(set(toy_locations_in_inital_location)) != len(toy_locations_in_inital_location):
             return False
@@ -196,10 +210,16 @@ class StateAction:
     def __hash__(self):
         return hash((self.state, self.action))
 
+    def __str__(self):
+        return f"{self.state}, {self.action}"
+    
     def copy(self):
         return StateAction(self.state.copy(), self.action.copy())
 
-    def is_reasonable(self):
+    def is_reasonable(self, check_state=False):
+        if check_state and not self.state.is_valid():
+            return False
+        
         # NAVIGATE
         if self.action.is_navigation():
             ## Checks about navigations and picks left
@@ -245,7 +265,7 @@ class StateAction:
             if self.state.navigations_left < 1:
                 return False
 
-            # Check if the robot is at the baby (duplicated from get_closeby_toy)
+            # Check if the robot is at the baby # todo: remove duplicate from get_closeby_toy down below
             if self.state.robot_location == Locations.BABY_LOCATION:
                 return False
 
@@ -266,62 +286,10 @@ class StateAction:
         return True
 
 
-### Service Calls ###
-class ServiceCalls:
-    # Dumb, that is they do not check if the action is possible to execute but only wrapper for node call #
-    def call_navigate(location):
-        try:
-            print(f"Navigating to {location}: ", end ="")
-            navigate_srv = rospy.ServiceProxy('navigate', navigate)
-            resp = navigate_srv(location)
-            print(resp.success)
-            Info.navigations_left -= 1
-            return resp.success
-        except rospy.ServiceException as e:
-            print("Service call failed: %s"%e)
-
-    def call_pick():
-        try:
-            toy_type = Info.get_state().get_closeby_toy()
-            if toy_type is None:
-                print("No toy to pick")
-                return False
-
-            pick_srv = rospy.ServiceProxy('pick', pick)
-            resp = pick_srv(toy_type)
-            print(f"Picking {toy_type}: {resp.success}")
-            Info.picks_left -= 1
-            return resp.success
-        except rospy.ServiceException as e:
-            print("Service call failed: %s"%e)
-
-    def call_place():
-        try:
-            place_srv = rospy.ServiceProxy('place', place)
-            resp = place_srv()
-            print(f"Placing: {resp.success}")
-            return resp.success
-        except rospy.ServiceException as e:
-            print("Service call failed: %s"%e)
-
-    def call_info():
-        try:
-            info_srv = rospy.ServiceProxy('info', info)
-            resp = info_srv()
-            return resp.internal_info
-        except rospy.ServiceException as e:
-            print("Service call failed: %s"%e)
-
-# internal_info caller and parser #
-class Info:
-    navigations_left = State.MAX_NAVIGATIONS
-    picks_left = State.MAX_PICKS
-
+### Skills Server ###
+# internal_info parser #
+class InfoParser:
     @staticmethod
-    def reset():
-        Info.navigations_left = State.MAX_NAVIGATIONS
-        Info.picks_left = State.MAX_PICKS
-
     def parse_dict(str, key_type="str"):
         parsed_dict = {}
         for keyval in str:
@@ -335,7 +303,8 @@ class Info:
         
         return parsed_dict
 
-    def parse_state(state_info):
+    @staticmethod
+    def parse_state(state_info) -> Tuple[int, dict, dict]:
         state_info = state_info.replace("\\", "")
         for i in range(4):
             state_info = state_info.replace(": ", ":")
@@ -356,39 +325,141 @@ class Info:
                 outs.append(var[1])
             
         robot_location = int(outs[0])
-        toys_location = Info.parse_dict(outs[1])
-        locations_toy = Info.parse_dict(outs[2], key_type="int")
-        toys_reward = Info.parse_dict(outs[3])
-        holding_toy = bool(outs[4])
+        toys_location = InfoParser.parse_dict(outs[1])
+        # 
+        # unuseful: locations_toy = InfoParser.parse_dict(outs[2], key_type="int")
+        toys_reward = InfoParser.parse_dict(outs[3])
+        # unuseful: holding_toy = bool(outs[4])
 
-        return State(robot_location, toys_location, Info.navigations_left, Info.picks_left), toys_reward
-
-    def parse_info(internal_info):
-        state, toys_reward = Info.parse_state(internal_info.split("\n\n")[1][:-1])    
+        return robot_location, toys_location, toys_reward
+    
+    @staticmethod
+    def parse_info(internal_info) -> Tuple[int, dict, int, str, int]:
+        robot_location, toys_location, toys_reward = InfoParser.parse_state(internal_info.split("\n\n")[1][:-1])    
         log = internal_info.split("\n\n")[2][6:-1] # backlog: parse log
         total_reward = int(internal_info.split("\n\n")[3][14:])
 
-        return state, log, total_reward, toys_reward
+        return robot_location, toys_location, toys_reward, log, total_reward
 
-    def get_info():
-        # Usage: state, log, total_reward, toys_reward = Info.get_info()
-        return Info.parse_info(ServiceCalls.call_info())
+class Info:
+    def __init__(self, state, toys_reward, log, total_reward):
+        self.state = state
+        self.toys_reward = toys_reward
+        self.log = log
+        self.total_reward = total_reward
 
-    def get_state() -> State:
-        state, _, _, _ = Info.get_info()
-        return state
+    def __str__(self):
+        return f"State: {self.state}, Toys reward: {self.toys_reward}, Log: {self.log}, Total reward: {self.total_reward}"
+
+class SkillsServer:
+    MAX_NAVIGATIONS = 8
+    MAX_PICKS = 6
     
-    def get_total_reward():
-        _, _, total_reward, _ = Info.get_info()
-        return total_reward
+    def __init__(self, verbose=True):
+        self.reset_parameters()
+        self.verbose = verbose
+        self.process = None
+        self.node = roslaunch.core.Node("task4_env", "skills_server.py", name="skills_server_node", output='log')
+        self.launcher = roslaunch.scriptapi.ROSLaunch()
+        self.launcher.start()
+    
+    def reset_parameters(self):
+        self.navigations_left = SkillsServer.MAX_NAVIGATIONS
+        self.picks_left = SkillsServer.MAX_PICKS
+    
+    # Operation #
+    def kill(self):
+        self.process.stop() if self.process else os.system("rosnode kill skills_server_node")
+        self.process = None
+    
+    def launch(self):
+        self.reset_parameters()
+        
+        self.launcher.launch(self.node)
+        # wait for services launched in server
+        rospy.wait_for_service('info')
+        rospy.wait_for_service('navigate')
+        rospy.wait_for_service('pick')
+        rospy.wait_for_service('place')
 
-    def get_toys_reward():
-        _, _, _, toys_reward = Info.get_info()
-        return toys_reward
+    def relaunch(self):
+        self.kill()
+        self.launch()
+
+    # Skills #
+    def navigate(self, location) -> bool:
+        self.navigations_left -= 1
+        success = self.call_navigate(location)
+        
+        if self.verbose:
+            print(f"Navigating to {location}: {success}")
+        
+        return success
+
+    def pick(self, toy_type) -> bool:
+        self.picks_left -= 1
+        success = self.call_pick(toy_type)
+        
+        if self.verbose:
+            print(f"Picking {toy_type}: {success}")
+        
+        return success
+    
+    def place(self) -> bool:
+        success = self.call_place()
+        
+        if self.verbose:
+            print(f"Placing: {success}")
+        
+        return success
+    
+    def get_info(self) -> Info: 
+        internal_info = self.call_info()
+        robot_location, toys_location, toys_reward, log, total_reward = InfoParser.parse_info(internal_info)
+        state = State(robot_location, toys_location, self.navigations_left, self.picks_left)
+        
+        return Info(state, toys_reward, log, total_reward)
+
+    # Service Calls #
+    def call_navigate(self, location) -> bool:
+        try:
+            navigate_srv = rospy.ServiceProxy('navigate', navigate)
+            resp = navigate_srv(location)
+            return resp.success
+        except rospy.ServiceException as e:
+            print("Service call failed: %s"%e)
+
+    def call_pick(self, toy_type) -> bool:
+        try:
+            pick_srv = rospy.ServiceProxy('pick', pick)
+            resp = pick_srv(toy_type)
+            return resp.success
+        except rospy.ServiceException as e:
+            print("Service call failed: %s"%e)
+
+    def call_place(self) -> bool:
+        try:
+            place_srv = rospy.ServiceProxy('place', place)
+            resp = place_srv()
+            return resp.success
+        except rospy.ServiceException as e:
+            print("Service call failed: %s"%e)
+
+    def call_info(self) -> str:
+        try:
+            info_srv = rospy.ServiceProxy('info', info)
+            resp = info_srv()
+            return resp.internal_info
+        except rospy.ServiceException as e:
+            print("Service call failed: %s"%e)
 
 
 ### Q-Learning ###
 class QTable:
+    q_table: Dict[StateAction, int]
+
+    EPS = 0.1
+    
     def __init__(self, file_name=None):
         if file_name is None:
             self.q_table = QTable.create_initial_q_table()
@@ -417,6 +488,9 @@ class QTable:
                     print(f"{state_action.action}, Reward: {reward}")
             i += 1
     
+    def get_reward(self, state: State, action: Action):
+        return self.q_table[StateAction(state, action)]
+    
     def print(self, skip_printing_factor=1000):
         QTable.print_q_table_formated_dict(self.q_table, skip_printing_factor)
 
@@ -434,25 +508,24 @@ class QTable:
                                 for picks_left in range(State.MAX_PICKS+1):
                                     state = State(robot_location, State.toy_locations_to_dict(red_location, green_location, blue_location, black_location), navigations_left, picks_left)
                                     if state.is_valid():
-                                        for action_num in Action.ALL_ACTIONS:
-                                            action = Action(action_num)
+                                        for action in [Action(action_num) for action_num in Action.ALL_ACTIONS]:
                                             state_action = StateAction(state, action)
                                             if state_action.is_reasonable():
                                                 q_table[state_action] = 0
         return q_table
     
-    def get_state_records(self, state: State):
+    def get_state_records(self, state: State) -> Dict[StateAction, int]:
         state_records = {}
         for state_action, reward in self.q_table.items():
             if state_action.state == state:
-                state_records[state_action.copy()] = reward
+                state_records[state_action] = reward
         return state_records
     
-    def get_updated_records(self):
+    def get_updated_records(self) -> Dict[StateAction, int]:
         updated_records = {}
         for state_action, reward in self.q_table.items():
             if reward != 0:
-                updated_records[state_action.copy()] = reward
+                updated_records[state_action] = reward
         return updated_records
     
     @staticmethod
@@ -472,86 +545,120 @@ class QTable:
 
     def update(self, state: State, action: Action, reward: int):
         self.q_table[StateAction(state, action)] = reward
-    
-# todo: all
-class QAlgorithm:
-    @staticmethod
-    def choose_next_action(state: State, q_table: QTable, print_options=False) -> Action:
-        state_records = q_table.get_state_records(state)
 
-        if print_options:
+    @staticmethod
+    def get_max_record_from_q_table_formated_dict(state_records: dict) -> tuple:
+        return max(state_records.items(), key=lambda item: item[1])
+    
+    def get_max_record(self) -> tuple:
+        return QTable.get_max_record_from_q_table_formated_dict(self.q_table)
+
+    def choose_next_action(self, state: State, learning_mode=False, verbose=True) -> Action:
+        # Eps-Greedy policy
+        state_records = self.get_state_records(state)
+        if not state_records:
+            if verbose:
+                print(f"No actions for state: {state}")
+            return None
+
+        if verbose:
             print(f"\nState: {state}\nOptions:")
             QTable.print_q_table_formated_dict(state_records, what_to_print="action_reward")
         
-        if state_records:
-            # todo: choose action based on calculations
-            state_action, _ = random.choice(list(state_records.items()))
-            return state_action.action
+        if learning_mode and random.random() < QTable.EPS:
+            state_action, reward = random.choice(list(state_records.items()))
         else:
-            return None
+            state_action = QTable.get_max_record_from_q_table_formated_dict(state_records)[0]
+        return state_action.action
+
+    def checkup(self, verbose=True) -> bool:
+        if verbose:
+            print("Checking the q_table:")
+        
+        todo_bien = True
+        for state_action, reward in self.q_table.items():
+            if not state_action.is_reasonable(check_state=True):
+                if verbose:
+                    print(f"Bad: {state_action}")
+                    print(f"Robot location: {self.state.robot_location}, Baby location: {Locations.BABY_LOCATION}, Equals: {self.state.robot_location == Locations.BABY_LOCATION}") # todo: deleteme
+                    print(f"closeby_toy: {self.state.get_closeby_toy()}") # todo: deleteme
+                    todo_bien = False
+                else:
+                    return False
+        
+        if verbose and todo_bien:
+            print("All good")
+        
+        return todo_bien
 
 
 ### Experiment Runner ###
 class ExperimentRunner:
-    def __init__(self, learning_mode=False, import_file_name=None, export_file_name=None, export_rate=1): # future: change file name
+    # future: update
+    LEARNING_MODE_ITERATIONS = 3
+    EXECUTE_MODE_ITERATIONS = 3 # future: 10
+    
+    def __init__(self, skills_server: SkillsServer, learning_mode=False, import_file_name=None, export_file_name=None, export_rate=5, verbose=None): # future: change file name
+        self.skills_server = skills_server 
         self.learning_mode = learning_mode
-        self.q_table = QTable(import_file_name) # future: check if learning_mode means starting with empty q_table
+        self.iterations = ExperimentRunner.LEARNING_MODE_ITERATIONS if learning_mode else ExperimentRunner.EXECUTE_MODE_ITERATIONS
+        self.q_table = QTable(import_file_name) # future: check if learning_mode means starting with empty q_table      
         self.export_file_name = export_file_name if export_file_name else QTable.generate_file_name()
-        self.iterations = 3 # if learning_mode else 10 # future: update
         self.export_rate = export_rate # Export the q_table once every 'export_rate' iterations
+        self.verbose = not self.learning_mode if verbose is None else verbose
 
     def reset_env(self):
         # Assumes skills_server is already running
         print(f"========== reset env =========")
 
         # Spawn toys and start at the baby
-        if not ServiceCalls.call_navigate(4):
+        if not self.skills_server.navigate(4):
             # make sure it did not fail
-            ServiceCalls.call_navigate(4)
+            self.skills_server.navigate(4)
 
         # Reset counters
-        SkillsServer.relaunch()
-        Info.reset()
+        self.skills_server.relaunch()
 
     def get_state_and_next_action(self):
-        state = Info.get_state()
-        return state, QAlgorithm.choose_next_action(state, self.q_table, print_options = not self.learning_mode)
+        state = self.skills_server.get_info().state        
+        return state, self.q_table.choose_next_action(state, self.learning_mode, self.verbose)
     
     def run_control(self): 
         state, action = self.get_state_and_next_action()
-        while action is not None:
-            action.perform()
+        while action is not None:          
+            action.perform(self.skills_server)
 
             if self.learning_mode:
-                total_reward = Info.get_total_reward()
+                total_reward = self.skills_server.get_info().total_reward
                 self.q_table.update(state, action, total_reward)
-                # print(f"Updated: State: {state}, Action: {action}, Reward: {total_reward}") # future: deleteme
+                if self.verbose:
+                    print(f"Updated {state}, {action} -> {total_reward}")
 
             state, action = self.get_state_and_next_action()
 
     def run_experiment(self):
-        SkillsServer.relaunch()
+        self.skills_server.relaunch()
 
         total_rewards = []
         for i in range(self.iterations):
             self.reset_env()
 
-            if not self.learning_mode:
-                print("\n\n===============================")
-                print(f"========== CONTROL {i+1} =========")
-                print("===============================")
-                print(f"Initial state: {Info.get_state()}")
-                print(f"Toys rewards: {Info.get_toys_reward()}")
+            info = self.skills_server.get_info()
+            print(f"\n\n========== ITERATION {i+1} =========")
+            print(f"Initial state: {info.state}")
+            print(f"Toys rewards: {info.toys_reward}")
 
             self.run_control()
             
             if not self.learning_mode:
-                total_reward = Info.get_total_reward()
+                info = self.skills_server.get_info()
+                
+                total_reward = info.total_reward
                 total_rewards.append(total_reward)
                 
-                print(f"\nFinal state: {Info.get_state()}")
+                print(f"\nFinal state: {info.state}")
                 print(f"========== Finished {i+1}, Total reward: {total_reward} =========\n\n")
-
+            
             # Export q_table once every 'self.export_rate' iterations
             if self.learning_mode and i % self.export_rate == 0:
                 file_path = self.q_table.export(self.export_file_name)
@@ -565,53 +672,30 @@ class ExperimentRunner:
         # Export the final q_table
         if self.learning_mode:
             file_path = self.q_table.export(self.export_file_name)
-            print(f"Q-table exported to: {file_path}\n\n")
-
-# Skill Server #
-class SkillsServer:
-    PROCESS = None
-    NODE = roslaunch.core.Node("task4_env", "skills_server.py", name="skills_server_node", output='log')
-    LAUNCH = roslaunch.scriptapi.ROSLaunch()
-    LAUNCH.start()
-
-    @staticmethod
-    def kill():
-        SkillsServer.PROCESS = None  # Define the "skills_server_process" variable
-        SkillsServer.PROCESS.stop() if SkillsServer.PROCESS else os.system("rosnode kill skills_server_node")
-    
-    @staticmethod
-    def launch():
-        SkillsServer.LAUNCH.launch(SkillsServer.NODE)
-        
-        # wait for services launched in server
-        rospy.wait_for_service('info')
-        rospy.wait_for_service('navigate')
-        rospy.wait_for_service('pick')
-        rospy.wait_for_service('place')
-
-    @staticmethod
-    def relaunch():
-        SkillsServer.kill()
-        SkillsServer.launch()
+            print(f"Final Q-table exported to: {file_path}\n\n")
 
 
 ### Main ###
-def main():
+def get_learning_mode_from_args() -> bool:
     try:
-        learning_mode = bool(int(sys.argv[1]))
+        return bool(int(sys.argv[1]))
     except:
-        print("Please provide learning mode flag (0/1) as an argument.")
-        return
+        return None
     
+def main():
+    learning_mode = get_learning_mode_from_args()
+    if learning_mode is None:
+        print("Please provide learning mode as an argument (0 or 1)")
+        return
     print(f"\n\n##### {'LEARNING' if learning_mode else 'EXECUTING'} #####\n\n")
-
-    experimentRunner = ExperimentRunner(learning_mode)
-    experimentRunner.run_experiment()
+    
+    skills_server = SkillsServer(verbose=not learning_mode)
+    try:
+        experimentRunner = ExperimentRunner(skills_server, learning_mode, import_file_name="initial_q_table.pkl")
+        experimentRunner.run_experiment()
+    finally:
+        skills_server.kill()
 
 if __name__ == '__main__':
-    try:
-        main()
-    finally:
-        # After Ctrl+C, stop all nodes from running
-        if SkillsServer.PROCESS:
-            SkillsServer.PROCESS.stop()
+    main()
+
