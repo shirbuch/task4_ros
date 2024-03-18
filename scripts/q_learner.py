@@ -1,5 +1,6 @@
 import datetime
 import pprint
+import stat
 import rospy
 import os
 import roslaunch
@@ -340,7 +341,21 @@ class Info:
 
 ### Q-Learning ###
 class QTable:
-    def init_q_table():
+    def __init__(self, file=None): # todo: change file
+        if file is None:
+            self.q_table = QTable.create_initial_q_table()
+        else:
+            self.q_table = self.load(file)
+            
+    def print(self, skip_printing_factor=1000):
+        i = 0
+        for state_action, reward in self.q_table.items():
+            if i % skip_printing_factor == 0:
+                print(f"{state_action.state}, {state_action.action}, Reward: {reward}")
+            i += 1
+
+    @staticmethod
+    def create_initial_q_table():
         # Q:SxA --> R
         # S: state, A: action, R: reward
         q_table = {}
@@ -358,32 +373,31 @@ class QTable:
                                             if state.is_reasonable_to_perform_action(action):
                                                 q_table[StateAction(state, action)] = 0
         return q_table
-
-    def print_q_table(q_table, skip_printing_factor=500):
-        i = 0
-        for state_action, reward in q_table.items():
-            if i % skip_printing_factor == 0:
-                print(f"{state_action.state}, {state_action.action}, Reward: {reward}")
-            i += 1
+    
+    def get_state_records(self, state: State):
+        return {state_action: reward for state_action, reward in self.q_table.items() if state_action.state == state}
 
     # todo: change from assuming running from src folder
-    def export_q_table(q_table, file_path="task4_env/q_tables/"):
+    def export(self, file_path="task4_env/q_tables/"):
         timestamp = datetime.datetime.now().strftime("%d-%m_%H-%M")
         file_name = file_path + "q_table_" + timestamp + ".pkl"
 
         with open(file_name, 'wb') as f:
-            pickle.dump(q_table, f)
+            pickle.dump(self.q_table, f)
         
         return file_name
 
-    def load_q_table(file_name):
+    def load(self, file_name):
         with open(file_name, 'rb') as f:
-            return pickle.load(f)
+            self.q_table = pickle.load(f)
 
 class RLActionDecision:
-    # todo
-    def choose_next_action() -> Action:
-        return Action(Action.PICK) #!!!
+    def choose_next_action(state: State, q_table: QTable) -> Action:
+        state = Info.get_state()
+        state_records = q_table.get_state_records(state)
+        pprint.pprint(state_records)
+        # todo: choose action based on calculations
+        return state_records[0].action if state_records else None
 
 
 ### Experiment Runner ###
@@ -402,15 +416,14 @@ class ExperimentRunner:
         SkillsServer.relaunch()
 
     @staticmethod
-    def run_control():
-        for action in [Action(Action.NAVIGATE0), Action(Action.PICK), Action(Action.NAVIGATE4), Action(Action.PLACE)]:
-            if not action.perform():
-                action.perform()
-        
-        # action = RLActionDecision.choose_next_action()
-        # while action is not None:
-        #     action.perform()
-        #     action = RLActionDecision.choose_next_action()
+    def run_control(): 
+        state = Info.get_state()
+        q_table = QTable()
+        action = RLActionDecision.choose_next_action(state, q_table)
+        while action is not None:
+            action.perform()
+            state = Info.get_state()
+            action = RLActionDecision.choose_next_action(state, q_table)
 
     @staticmethod
     def run_experiment(times=3):
@@ -472,11 +485,8 @@ def experiment_main():
     ExperimentRunner.run_experiment()
 
 def q_table_main():
-    q_table = QTable.init_q_table()
+    q_table = QTable()
     print(q_table.__len__())
-
-    file_name = QTable.export_q_table(q_table)
-    q_table = QTable.load_q_table(file_name)
 
     # QLearning.print_q_table(q_table)
     print(q_table.__len__())

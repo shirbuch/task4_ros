@@ -46,4 +46,16 @@ def validate_states_tests():
 
 ### Main ###
 if __name__ == "__main__":
-    basic_toy_pick_and_place()
+    state = Info.get_state()
+    print(state)
+
+    q_table = QTable()
+
+    q_table.print()
+
+
+    # q_table = QTable()
+    # print(q_table)
+    # state_records = {state_action: reward for state_action, reward in q_table.q_table.items() if state_action.state == state}
+    # pprint.pprint(state_records)
+    
