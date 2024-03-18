@@ -101,6 +101,9 @@ class State:
     def __str__(self):
         return f"(Robot: {self.robot_location}, red: {self.toys_location[ToyTypes.RED]}, green: {self.toys_location[ToyTypes.GREEN]}, blue: {self.toys_location[ToyTypes.BLUE]}, black: {self.toys_location[ToyTypes.BLACK]})"
 
+    def __eq__(self, other):
+        return self.robot_location == other.robot_location and self.toys_location == other.toys_location
+
     def get_closeby_toy(self):
         if self.robot_location == Locations.BABY_LOCATION:
             return None
@@ -370,8 +373,8 @@ class QTable:
                 for green_location in Locations.TOYS_LOCATIONS:
                     for blue_location in Locations.TOYS_LOCATIONS:
                         for black_location in Locations.TOYS_LOCATIONS:
-                            for navigations_left in range(State.MAX_NAVIGATIONS):
-                                for picks_left in range(State.MAX_PICKS):
+                            for navigations_left in range(State.MAX_NAVIGATIONS+1):
+                                for picks_left in range(State.MAX_PICKS+1):
                                     state = State(robot_location, State.toy_locations_to_dict(red_location, green_location, blue_location, black_location), navigations_left, picks_left)
                                     if state.is_valid():
                                         for action_num in Action.ALL_ACTIONS:

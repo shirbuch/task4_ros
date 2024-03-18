@@ -46,18 +46,24 @@ def validate_states_tests():
 
 ### Main ###
 if __name__ == "__main__":
-    file_name = "task4_env/q_tables/important/q_table_13560.pkl"
-    q_table = QTable(file_name)
-    q_table.print()
-    print(q_table.q_table.__len__())
+    s1 = State(4, State.toy_locations_to_dict(0, 1, 2, 3))
+    s2 = State(4, State.toy_locations_to_dict(0, 1, 2, 3))
+    s3 = State(0, State.toy_locations_to_dict(0, 1, 2, 3))
+
+    print(s1 == s2)
+    print(s1 == s3)
+    print(s2 == s3)
+
+    # file_name = "task4_env/q_tables/important/q_table_13560.pkl"
+    # q_table = QTable(file_name)
+    # q_table.print()
+    # print(q_table.q_table.__len__())
 
 
-
+    # # q_table = QTable()
     # state = Info.get_state()
     # print(state)
 
-    # q_table = QTable()
-    # print(q_table)
-    # state_records = {state_action: reward for state_action, reward in q_table.q_table.items() if state_action.state == state}
-    # pprint.pprint(state_records)
+    # state_records = q_table.get_state_records(state)
+    # print(state_records)
     
