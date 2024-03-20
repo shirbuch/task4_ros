@@ -172,8 +172,10 @@ class State:
         return State.MAX_NAVIGATIONS - self.navigations_left
     
     def is_valid(self):
+        toy_locations_list = self.get_toys_location_list()
+
         ## Checks by number of moved toys
-        number_of_moved_toys = sum(1 for toy_location in self.get_toys_location_list() if toy_location not in Locations.INITIAL_TOYS_LOCATIONS)
+        number_of_moved_toys = sum(1 for toy_location in toy_locations_list if toy_location not in Locations.INITIAL_TOYS_LOCATIONS)
 
         # Check if the number of moved toys is not the same as the number of used picks (pick always succeeds if there is a toy nearby)
         if number_of_moved_toys != self.get_used_picks():
@@ -184,19 +186,18 @@ class State:
             return False
         
         # Check if the robot is holding more than one toy
-        toy_locations = self.get_toys_location_list()
-        if toy_locations.count(Locations.KNAPSACK_LOCATION) > 1:
+        if toy_locations_list.count(Locations.KNAPSACK_LOCATION) > 1:
             return False
 
         # Check if there are two toys in the same start location
-        toy_locations_in_inital_location = [toy_location for toy_location in toy_locations if toy_location in Locations.INITIAL_TOYS_LOCATIONS]
+        toy_locations_in_inital_location = [toy_location for toy_location in toy_locations_list if toy_location in Locations.INITIAL_TOYS_LOCATIONS]
         if len(set(toy_locations_in_inital_location)) != len(toy_locations_in_inital_location):
             return False
 
         # Check if the robot is at a toy and has all navigations left
         if self.robot_location != Locations.BABY_LOCATION and self.navigations_left == State.MAX_NAVIGATIONS:
             return False
-
+        
         return True
 
 class StateAction:
@@ -216,10 +217,7 @@ class StateAction:
     def copy(self):
         return StateAction(self.state.copy(), self.action.copy())
 
-    def is_reasonable(self, check_state=False):
-        if check_state and not self.state.is_valid():
-            return False
-        
+    def is_reasonable(self):        
         # NAVIGATE
         if self.action.is_navigation():
             ## Checks about navigations and picks left
@@ -462,12 +460,13 @@ class QTable:
     
     def __init__(self, file_name=None):
         if file_name is None:
-            self.q_table = QTable.create_initial_q_table()
+            self.create_initial_q_table()
         else:
             file_dir="task4_env/q_tables/"  # future: change file_dir from assuming running from src folder
             file_path = file_dir + file_name
             with open(file_path, 'rb') as f:
                 self.q_table = pickle.load(f)
+        self.checkup()
 
     @staticmethod
     def print_q_table_formated_dict(q_table_formated_dict: dict, skip_printing_factor=1, what_to_print="all"):
@@ -494,11 +493,10 @@ class QTable:
     def print(self, skip_printing_factor=1000):
         QTable.print_q_table_formated_dict(self.q_table, skip_printing_factor)
 
-    @staticmethod
-    def create_initial_q_table():
+    def create_initial_q_table(self):
         # Q:SxA --> R
         # S: state, A: action, R: reward
-        q_table = {}
+        self.q_table = {}
         for robot_location in Locations.ROBOT_LOCATIONS:
             for red_location in Locations.TOYS_LOCATIONS:
                 for green_location in Locations.TOYS_LOCATIONS:
@@ -511,8 +509,7 @@ class QTable:
                                         for action in [Action(action_num) for action_num in Action.ALL_ACTIONS]:
                                             state_action = StateAction(state, action)
                                             if state_action.is_reasonable():
-                                                q_table[state_action] = 0
-        return q_table
+                                                self.update(state, action, 0)
     
     def get_state_records(self, state: State) -> Dict[StateAction, int]:
         state_records = {}
@@ -571,26 +568,12 @@ class QTable:
             state_action = QTable.get_max_record_from_q_table_formated_dict(state_records)[0]
         return state_action.action
 
-    def checkup(self, verbose=True) -> bool:
-        if verbose:
-            print("Checking the q_table:")
-        
-        todo_bien = True
+    def checkup(self):
         for state_action, reward in self.q_table.items():
-            if not state_action.is_reasonable(check_state=True):
-                if verbose:
-                    print(f"Bad: {state_action}")
-                    print(f"Robot location: {self.state.robot_location}, Baby location: {Locations.BABY_LOCATION}, Equals: {self.state.robot_location == Locations.BABY_LOCATION}") # todo: deleteme
-                    print(f"closeby_toy: {self.state.get_closeby_toy()}") # todo: deleteme
-                    todo_bien = False
-                else:
-                    return False
-        
-        if verbose and todo_bien:
-            print("All good")
-        
-        return todo_bien
-
+            if not state_action.state.is_valid():
+                raise Exception(f"Invalid State in q_table:\n{state_action.state}")
+            if not state_action.is_reasonable():
+                raise Exception(f"Not reasonable record in q_table:\n{state_action}")
 
 ### Experiment Runner ###
 class ExperimentRunner:
