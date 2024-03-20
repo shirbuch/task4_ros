@@ -69,13 +69,9 @@ def see_state_records_before_and_after_nav():
 ### q_table load and export ###
 INITIAL_Q_TABLE_FILE_NAME = "initial_q_table.pkl"
 
-def create_and_export_initial_q_table(file_name=INITIAL_Q_TABLE_FILE_NAME):
+def create_and_export_initial_q_table(file_name=INITIAL_Q_TABLE_FILE_NAME) -> QTable:
     q_table = QTable()
     q_table.export(file_name)
-
-def load_q_table_and_print_only_updated_records(file_name):
-    q_table = QTable(file_name)
-    QTable.print_q_table_formated_dict(q_table.get_updated_records())
     return q_table
 
 def test_create_and_export_and_load_initial_q_table():
@@ -117,10 +113,46 @@ def test_update_not_making_double_key(file_name=INITIAL_Q_TABLE_FILE_NAME):
     q_table.checkup()
     print("if nothing printed before, all good!")
 
+
+### New ###
 DUPLICATES_Q_TABLE_FILE_NAME = "duplicates_q_table copy.pkl"
 MOST_RECENT_Q_TABLE_FILE_NAME = "most_recent_q_table.pkl"
+DUPLICATED_STATE_ACTION = StateAction(State(0, State.toy_locations_to_dict(1, 2, 3, 0), 7, 6), Action(Action.PICK))
+
+def print_updated_records(file_name=MOST_RECENT_Q_TABLE_FILE_NAME):
+    q_table = QTable(file_name)
+    QTable.print_q_table_formated_dict(q_table.get_updated_records())
+    return q_table
+
+def check_no_double_key(file_name=MOST_RECENT_Q_TABLE_FILE_NAME):
+    q_table = QTable(file_name)
+    q_table.checkup()
+    print("if nothing printed before, all good!")
+
+def init_new_table_run_and_checkup():
+    q_table = create_and_export_initial_q_table(MOST_RECENT_Q_TABLE_FILE_NAME)
+    print("\nBefore update:")
+    QTable.print_q_table_formated_dict(q_table.get_state_records(DUPLICATED_STATE_ACTION.state))
+    run(learning_mode=True)
+    print("\nAfter update:")
+    QTable.print_q_table_formated_dict(q_table.get_state_records(DUPLICATED_STATE_ACTION.state))
+    check_no_double_key(MOST_RECENT_Q_TABLE_FILE_NAME)
+
+def init_recent_table():
+    create_and_export_initial_q_table(MOST_RECENT_Q_TABLE_FILE_NAME)
+
+def print_table(file_name=MOST_RECENT_Q_TABLE_FILE_NAME):
+    q_table = QTable(file_name)
+    q_table.print()
 
 ### Main ###
 if __name__ == "__main__":
-    test_update_not_making_double_key()
+    # init_recent_table()
+    # check_no_double_key()
+    # print_table()
+    # print_updated_records()
+    # q_table.q_table = {k: v for k, v in q_table.q_table.items() if v != QTable.INIT_VALUE}
+    # q_table.export(MOST_RECENT_Q_TABLE_FILE_NAME)
+    check_no_double_key()
     
+    pass

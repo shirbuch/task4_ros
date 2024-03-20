@@ -4,3 +4,6 @@ scripts/my_control.py
 scripts/my_experiment.py
 q_table_*.pkl
 scripts/unused_code.py
+.idea/
+*/q_table*.pkl
+q_tables/old or bad/

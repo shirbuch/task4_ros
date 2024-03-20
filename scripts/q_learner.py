@@ -740,16 +740,21 @@ class SkillsServer:
 class QTable:
     q_table: Dict[StateAction, int]
 
+    INIT_VALUE = -100
     EPS = 0.1
-    
+
     def __init__(self, file_name=None):
         if file_name is None:
             self.create_initial_q_table()
         else:
             file_dir="task4_env/q_tables/"  # future: change file_dir from assuming running from src folder
             file_path = file_dir + file_name
-            with open(file_path, 'rb') as f:
-                self.q_table = pickle.load(f)
+            
+            if not os.path.exists(file_path):
+                self.create_initial_q_table()
+            else:
+                with open(file_path, 'rb') as f:
+                    self.q_table = pickle.load(f)
         
     @staticmethod
     def print_q_table_formated_dict(q_table_formated_dict: dict, skip_printing_factor=1, what_to_print="all"):
@@ -776,6 +781,9 @@ class QTable:
     def print(self, skip_printing_factor=1000):
         QTable.print_q_table_formated_dict(self.q_table, skip_printing_factor)
 
+    def print_state_records(self, state: State):
+        QTable.print_q_table_formated_dict(self.get_state_records(state), what_to_print="all")
+    
     def create_initial_q_table(self):
         # Q:SxA --> R
         # S: state, A: action, R: reward
@@ -792,7 +800,7 @@ class QTable:
                                         for action in [Action(action_num) for action_num in Action.ALL_ACTIONS]:
                                             state_action = StateAction(state, action)
                                             if state_action.is_reasonable():
-                                                self.update(state, action, 0)
+                                                self.q_table[state_action] = QTable.INIT_VALUE # todo: update
     
     def get_state_records(self, state: State) -> Dict[StateAction, int]:
         state_records = {}
@@ -804,7 +812,7 @@ class QTable:
     def get_updated_records(self) -> Dict[StateAction, int]:
         updated_records = {}
         for state_action, reward in self.q_table.items():
-            if reward != 0:
+            if reward != QTable.INIT_VALUE:
                 updated_records[state_action] = reward
         return updated_records
     
@@ -825,6 +833,30 @@ class QTable:
 
     def update(self, state: State, action: Action, reward: int):
         self.q_table[StateAction(state, action)] = reward
+        # state_action = StateAction(state, action)
+        
+        # todo: deleteme
+        # state_action_records_list = [state_action_record for state_action_record in self.get_state_records(state).items() if state_action_record[0].action == action]
+        # state_action_records = {}
+        # for state_action_record in state_action_records_list:
+        #     state_action_records[state_action_record[0]] = state_action_record[1]
+        
+        # do_print = state_action_records_list.__len__() > 1
+        # if do_print:
+        #     print(f"\nUpdating: {state_action}, Reward: {reward}")
+        #     QTable.print_q_table_formated_dict(state_action_records, what_to_print="all")
+        
+        # if state_action in self.q_table:
+        #     # print(f"Warning: Updating existing record in q_table: {state_action}, from: {self.q_table[state_action]} to {reward}")
+        #     del self.q_table[state_action]
+        # self.q_table[state_action] = reward
+        
+        # todo: fix this
+        # self.q_table = {k: v for k, v in self.q_table.items() if v != QTable.INIT_VALUE}
+        
+        # if do_print:
+        #     print(f"===> After:")
+        #     QTable.print_q_table_formated_dict(state_action_records, what_to_print="all")
 
     @staticmethod
     def get_max_record_from_q_table_formated_dict(state_records: dict) -> tuple:
@@ -862,15 +894,15 @@ class QTable:
         # Check duplicates of keys
         updated_records = self.get_updated_records().items()
         for state_action, reward in updated_records:
-            for not_updated_state_action, not_updated_reward in self.q_table.items() - updated_records:
-                if state_action == not_updated_state_action:
-                    print(f"Warning: Duplicate key in q_table, first found:\n{state_action}: {reward}, {not_updated_reward}")
-                    # todo: return
+            num_duplicated = sum(1 for not_updated_state_action, not_updated_reward in self.q_table.items() - updated_records if state_action == not_updated_state_action)
+            if num_duplicated > 0:
+                print(f"Warning: Duplicate key in q_table {num_duplicated} times! for:\n{state_action}, Rewards: {[state_record[1] for state_record in self.get_state_records(state_action.state).items() if state_record[0].action == state_action.action]}")
+                return
 
 
 ### Experiment Runner ###
 class ExperimentRunner:
-    LEARNING_MODE_ITERATIONS = 3  # future: update
+    LEARNING_MODE_ITERATIONS = 1000  # future: update
     EXECUTE_MODE_ITERATIONS = 10
     MOST_RECENT_Q_TABLE_FILE_NAME = "most_recent_q_table.pkl" # future: update
     
@@ -970,7 +1002,7 @@ def run(learning_mode, verbose=False):
     skills_server = SkillsServer(verbose) # future: =not learning_mode
     try:
         import_file_name = ExperimentRunner.MOST_RECENT_Q_TABLE_FILE_NAME
-        experimentRunner = ExperimentRunner(skills_server, learning_mode, import_file_name=import_file_name, export_rate=1, verbose=verbose) # future: =not learning_mode
+        experimentRunner = ExperimentRunner(skills_server, learning_mode, import_file_name=import_file_name, export_rate=50, verbose=verbose) # future: =not learning_mode
         experimentRunner.run_experiment()
     finally:
         skills_server.kill()
