@@ -750,8 +750,7 @@ class QTable:
             file_path = file_dir + file_name
             with open(file_path, 'rb') as f:
                 self.q_table = pickle.load(f)
-        self.checkup()
-
+        
     @staticmethod
     def print_q_table_formated_dict(q_table_formated_dict: dict, skip_printing_factor=1, what_to_print="all"):
         if not q_table_formated_dict:
@@ -851,11 +850,22 @@ class QTable:
         return state_action.action
 
     def checkup(self):
+        # Check that all the states are valid, and that all their corresponding actions are reasonable
         for state_action, reward in self.q_table.items():
             if not state_action.state.is_valid():
-                raise Exception(f"Invalid State in q_table:\n{state_action.state}")
+                print(f"Warning: Invalid State in q_table, first found:\n{state_action.state}")
+                return
             if not state_action.is_reasonable():
-                raise Exception(f"Not reasonable record in q_table:\n{state_action}")
+                print(f"Warning: Not reasonable record in q_table, first found:\n{state_action}")
+                return
+
+        # Check duplicates of keys
+        updated_records = self.get_updated_records().items()
+        for state_action, reward in updated_records:
+            for not_updated_state_action, not_updated_reward in self.q_table.items() - updated_records:
+                if state_action == not_updated_state_action:
+                    print(f"Warning: Duplicate key in q_table, first found:\n{state_action}: {reward}, {not_updated_reward}")
+                    # todo: return
 
 
 ### Experiment Runner ###
@@ -955,7 +965,16 @@ def get_learning_mode_from_args() -> bool:
         return bool(int(sys.argv[1]))
     except:
         return None
-    
+
+def run(learning_mode, verbose=False):
+    skills_server = SkillsServer(verbose) # future: =not learning_mode
+    try:
+        import_file_name = ExperimentRunner.MOST_RECENT_Q_TABLE_FILE_NAME
+        experimentRunner = ExperimentRunner(skills_server, learning_mode, import_file_name=import_file_name, export_rate=1, verbose=verbose) # future: =not learning_mode
+        experimentRunner.run_experiment()
+    finally:
+        skills_server.kill()
+
 def main():
     learning_mode = get_learning_mode_from_args()
     if learning_mode is None:
@@ -964,13 +983,7 @@ def main():
     print(f"\n\n##### {'LEARNING' if learning_mode else 'EXECUTING'} #####\n\n") 
     verbose = not learning_mode
     
-    skills_server = SkillsServer(verbose) # future: =not learning_mode
-    try:
-        import_file_name = ExperimentRunner.MOST_RECENT_Q_TABLE_FILE_NAME
-        experimentRunner = ExperimentRunner(skills_server, learning_mode, import_file_name=import_file_name, export_rate=1, verbose=verbose) # future: =not learning_mode
-        experimentRunner.run_experiment()
-    finally:
-        skills_server.kill()
+    run(learning_mode, verbose)
 
 if __name__ == '__main__':
     main()

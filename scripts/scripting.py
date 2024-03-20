@@ -76,6 +76,7 @@ def create_and_export_initial_q_table(file_name=INITIAL_Q_TABLE_FILE_NAME):
 def load_q_table_and_print_only_updated_records(file_name):
     q_table = QTable(file_name)
     QTable.print_q_table_formated_dict(q_table.get_updated_records())
+    return q_table
 
 def test_create_and_export_and_load_initial_q_table():
     create_and_export_initial_q_table()    
@@ -92,7 +93,6 @@ def check_if_pick_exist_in_q_table_for_relevant_state(q_table: QTable):
     state = State(0, State.toy_locations_to_dict(3, 2, 0, 1), 7, 6)
     QTable.print_q_table_formated_dict(q_table.get_state_records(state))
 
-### q_table get reward and max item ###
 def test_get_reward_and_max_record():
     q_table = QTable(INITIAL_Q_TABLE_FILE_NAME)
     
@@ -111,10 +111,16 @@ def test_get_reward_and_max_record():
     max_record = q_table.get_max_record()
     print(f"Max item: State: {max_record[0]}, Reward: {max_record[1]}")
 
+def test_update_not_making_double_key(file_name=INITIAL_Q_TABLE_FILE_NAME):
+    q_table = QTable(file_name)
+    run(learning_mode=True)
+    q_table.checkup()
+    print("if nothing printed before, all good!")
+
+DUPLICATES_Q_TABLE_FILE_NAME = "duplicates_q_table copy.pkl"
+MOST_RECENT_Q_TABLE_FILE_NAME = "most_recent_q_table.pkl"
 
 ### Main ###
 if __name__ == "__main__":
-    file_name = ExperimentRunner.MOST_RECENT_Q_TABLE_FILE_NAME
-    # create_and_export_initial_q_table(file_name)
-    load_q_table_and_print_only_updated_records(file_name)
+    test_update_not_making_double_key()
     
