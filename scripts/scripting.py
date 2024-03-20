@@ -67,20 +67,19 @@ def see_state_records_before_and_after_nav():
     print(q_table.q_table.__len__())
 
 ### q_table load and export ###
-def create_and_export_initial_q_table():
+INITIAL_Q_TABLE_FILE_NAME = "initial_q_table.pkl"
+
+def create_and_export_initial_q_table(file_name=INITIAL_Q_TABLE_FILE_NAME):
     q_table = QTable()
-    q_table.export("initial_q_table.pkl")
+    q_table.export(file_name)
 
 def load_q_table_and_print_only_updated_records(file_name):
     q_table = QTable(file_name)
     QTable.print_q_table_formated_dict(q_table.get_updated_records())
 
-INITAL_Q_TABLE_FILE_NAME = "initial_q_table.pkl"
-ONE_ITERATION_Q_TABLE_FILE_NAME = "one_iteration_q_table.pkl"
-
 def test_create_and_export_and_load_initial_q_table():
     create_and_export_initial_q_table()    
-    q_table = QTable(INITAL_Q_TABLE_FILE_NAME)
+    q_table = QTable(INITIAL_Q_TABLE_FILE_NAME)
     q_table.print(1)
 
 def check_if_pick_is_reasonable_on_relevant_state():
@@ -95,7 +94,7 @@ def check_if_pick_exist_in_q_table_for_relevant_state(q_table: QTable):
 
 ### q_table get reward and max item ###
 def test_get_reward_and_max_record():
-    q_table = QTable(INITAL_Q_TABLE_FILE_NAME)
+    q_table = QTable(INITIAL_Q_TABLE_FILE_NAME)
     
     # Pick arbitrary item
     state_action, reward = list(q_table.q_table.items())[0]
@@ -116,5 +115,6 @@ def test_get_reward_and_max_record():
 ### Main ###
 if __name__ == "__main__":
     file_name = ExperimentRunner.MOST_RECENT_Q_TABLE_FILE_NAME
+    # create_and_export_initial_q_table(file_name)
     load_q_table_and_print_only_updated_records(file_name)
     

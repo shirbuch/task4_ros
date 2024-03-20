@@ -268,7 +268,7 @@ class StateAction:
             if self.state.navigations_left < 1:
                 return False
 
-            # Check if the robot is at the baby # todo: remove duplicate from get_closeby_toy down below
+            # Check if the robot is at the baby # backlog: remove duplicate from get_closeby_toy down below
             if self.state.robot_location == Locations.BABY_LOCATION:
                 return False
 
@@ -358,8 +358,22 @@ class Info:
 # future: delete
 class ServerSimulator:
     def __init__(self):
-        self.reset()
-    
+        self.SUCCEEDED = 3
+        self.actions = []
+        self.observations = []
+        self.rewards = []
+        self.log = []
+        self.total_reward_msg = ""
+        self.state_toy_locations={"green":0, "blue":1, "black":2, "red":3}
+        self.state_locations_toy={0:"green", 1:"blue", 2:"black", 3:"red", 5:"None"}
+        self.state_toy_rewards={"green":15, "blue":20, "black":30, "red":40}
+        self.state_robot_location = 4
+        self.state_is_holding= False
+        self.state_holding_object_name = None
+        self.objects=["green", "blue", "black", "red"]
+        self.pick_calls=0
+        self.nav_calls=0
+        
     def reset(self):
         self.SUCCEEDED = 3
         self.actions = []
@@ -382,15 +396,15 @@ class ServerSimulator:
         return "state:[robot location:{} toys_location:{} locations_toy:{} toys_reward:{} holding_toy:{}]".format(self.state_robot_location, self.state_toy_locations, self.state_locations_toy, self.state_toy_rewards, self.state_is_holding)
 
     def calc_rewards(self): # fixed reward per toy
-        self.rewards=[15, 20, 30, 40]    
+        rewards=[15, 20, 30, 40]    
         a_reward = 0
-        self.state_toy_rewards[self.objects[0]] = self.rewards[a_reward]
+        self.state_toy_rewards[self.objects[0]] = rewards[a_reward]
         b_reward = 1
-        self.state_toy_rewards[self.objects[1]] = self.rewards[b_reward]
+        self.state_toy_rewards[self.objects[1]] = rewards[b_reward]
         c_reward = 2
-        self.state_toy_rewards[self.objects[2]] = self.rewards[c_reward]
+        self.state_toy_rewards[self.objects[2]] = rewards[c_reward]
         d_reward = 3
-        self.state_toy_rewards[self.objects[3]] = self.rewards[d_reward]
+        self.state_toy_rewards[self.objects[3]] = rewards[d_reward]
         # print("rewards:")
         # print(self.state_toy_rewards)
 
@@ -607,18 +621,22 @@ class SkillsServer:
     MAX_PICKS = 6
     
     def __init__(self, verbose=True):
-        self.reset_parameters()
+        self.navigations_left = SkillsServer.MAX_NAVIGATIONS
+        self.picks_left = SkillsServer.MAX_PICKS
         self.verbose = verbose
-        self.process = None
         # future: revert   
         # self.node = roslaunch.core.Node("task4_env", "skills_server.py", name="skills_server_node", output='log')
         # self.launcher = roslaunch.scriptapi.ROSLaunch()
         # self.launcher.start()
+        self.process = None
         self.server_simulator = ServerSimulator()
-    
+            
     def reset_parameters(self):
         self.navigations_left = SkillsServer.MAX_NAVIGATIONS
         self.picks_left = SkillsServer.MAX_PICKS
+        
+        # future: revert
+        self.server_simulator.reset()
     
     # Operation #
     def kill(self):
@@ -629,7 +647,7 @@ class SkillsServer:
     def launch(self):
         self.reset_parameters()
         
-          # future: revert
+        # future: revert
         # self.launcher.launch(self.node)
         # # wait for services launched in server
         # rospy.wait_for_service('info')
@@ -842,10 +860,9 @@ class QTable:
 
 ### Experiment Runner ###
 class ExperimentRunner:
-    # future: update
-    LEARNING_MODE_ITERATIONS = 3
-    EXECUTE_MODE_ITERATIONS = 3 # future: 10
-    MOST_RECENT_Q_TABLE_FILE_NAME = "most_recent_q_table.pkl"
+    LEARNING_MODE_ITERATIONS = 3  # future: update
+    EXECUTE_MODE_ITERATIONS = 10
+    MOST_RECENT_Q_TABLE_FILE_NAME = "most_recent_q_table.pkl" # future: update
     
     def __init__(self, skills_server: SkillsServer, learning_mode=False, import_file_name=None, export_file_name=None, export_rate=5, verbose=None): # future: change file name
         self.skills_server = skills_server 
@@ -874,20 +891,21 @@ class ExperimentRunner:
     
     def run_control(self): 
         state, action = self.get_state_and_next_action()
-        prev_total_reward = self.skills_server.get_info().total_reward
+        prev_total_reward = 0
         while action is not None:
             action.perform(self.skills_server)
-
+            
+            total_reward = self.skills_server.get_info().total_reward
+            action_reward = total_reward - prev_total_reward
+            prev_total_reward = total_reward
+    
             if self.learning_mode:                
-                total_reward = self.skills_server.get_info().total_reward
-                action_reward = total_reward - prev_total_reward
-                
                 self.q_table.update(state, action, action_reward)
-                if self.verbose:
-                    print(f"Updated {state}, {action} -> {action_reward}")
-        
-                prev_total_reward = total_reward
-        
+                
+            if self.verbose:
+                print(f"Action Reward: {action_reward}")
+                print(f"Total reward: {total_reward}\n")
+            
             state, action = self.get_state_and_next_action()
 
     def run_experiment(self):
@@ -943,12 +961,13 @@ def main():
     if learning_mode is None:
         print("Please provide learning mode as an argument (0 or 1)")
         return
-    print(f"\n\n##### {'LEARNING' if learning_mode else 'EXECUTING'} #####\n\n")
+    print(f"\n\n##### {'LEARNING' if learning_mode else 'EXECUTING'} #####\n\n") 
+    verbose = not learning_mode
     
-    skills_server = SkillsServer(verbose=True) # future: =not learning_mode
+    skills_server = SkillsServer(verbose) # future: =not learning_mode
     try:
         import_file_name = ExperimentRunner.MOST_RECENT_Q_TABLE_FILE_NAME
-        experimentRunner = ExperimentRunner(skills_server, learning_mode, import_file_name=import_file_name, export_rate=1, verbose=True) # future: =not learning_mode
+        experimentRunner = ExperimentRunner(skills_server, learning_mode, import_file_name=import_file_name, export_rate=1, verbose=verbose) # future: =not learning_mode
         experimentRunner.run_experiment()
     finally:
         skills_server.kill()
