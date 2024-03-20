@@ -8,6 +8,11 @@ import os
 import roslaunch
 from task4_env.srv import *
 import pickle
+# future: revert
+import random
+from geometry_msgs.msg import Point
+from task4_env.srv import navigate, navigateResponse, pick, pickResponse, place, placeResponse, info, infoResponse  #
+import numpy as np
 
 
 ### Constants ###
@@ -349,6 +354,255 @@ class Info:
     def __str__(self):
         return f"State: {self.state}, Toys reward: {self.toys_reward}, Log: {self.log}, Total reward: {self.total_reward}"
 
+### Server Simulator ###
+# future: delete
+class ServerSimulator:
+    def __init__(self):
+        self.reset()
+    
+    def reset(self):
+        self.SUCCEEDED = 3
+        self.actions = []
+        self.observations = []
+        self.rewards = []
+        self.log = []
+        self.total_reward_msg = ""
+        self.state_toy_locations={"green":0, "blue":1, "black":2, "red":3}
+        self.state_locations_toy={0:"green", 1:"blue", 2:"black", 3:"red", 5:"None"}
+        self.state_toy_rewards={"green":15, "blue":20, "black":30, "red":40}
+        self.state_robot_location = 4
+        self.state_is_holding= False
+        self.state_holding_object_name = None
+        self.objects=["green", "blue", "black", "red"]
+        self.pick_calls=0
+        self.nav_calls=0
+
+    # Helper Methods #
+    def get_state(self):
+        return "state:[robot location:{} toys_location:{} locations_toy:{} toys_reward:{} holding_toy:{}]".format(self.state_robot_location, self.state_toy_locations, self.state_locations_toy, self.state_toy_rewards, self.state_is_holding)
+
+    def calc_rewards(self): # fixed reward per toy
+        self.rewards=[15, 20, 30, 40]    
+        a_reward = 0
+        self.state_toy_rewards[self.objects[0]] = self.rewards[a_reward]
+        b_reward = 1
+        self.state_toy_rewards[self.objects[1]] = self.rewards[b_reward]
+        c_reward = 2
+        self.state_toy_rewards[self.objects[2]] = self.rewards[c_reward]
+        d_reward = 3
+        self.state_toy_rewards[self.objects[3]] = self.rewards[d_reward]
+        print("rewards:")
+        print(self.state_toy_rewards)
+
+    def calc_nav_succ(self, location): # navigate fails, the no motion is executed in gazebo (state does not change, nav counter +1)
+        weightsSuccess = [0.8,0.85,0.9,0.75,1.0] # navigation success is dependent on the location
+        weightsObs = [1.0,1.0,1.0,1.0,1.0] # nav success is always observed correctly	
+        succ = random.random() <= weightsSuccess[location]
+        obs = random.random() <= weightsObs[location]
+        print("sampled navigate real obs:{}".format(obs))
+        print("sampled navigate succ:{}".format(succ))
+        if obs:
+            return (succ,succ)
+        else:
+            return (succ, not succ)
+
+    def calc_locations(self): # we can leave this, the toys get distributed to location according to the same backstory
+        locations = {}
+        weightsLocationA = [0.1,0.05,0.8,0.05]
+        a_location = np.random.choice(4, 1, p=weightsLocationA)[0]
+        locations[a_location]=self.objects[0]
+
+        weightsLocationB = [0.7,0.1,0.1,0.1]
+        selectedWeight = weightsLocationB[a_location]
+        for i in range(4):
+            weightsLocationB[i] += selectedWeight/3.0
+        weightsLocationB[a_location]=0
+        b_location = np.random.choice(4, 1, p=weightsLocationB)[0]
+        locations[b_location] = self.objects[1]
+
+        weightsLocationC = [0.25, 0.25, 0.25, 0.25]
+        selectedWeight = weightsLocationC[a_location]+weightsLocationC[b_location]
+        for i in range(4):
+            weightsLocationC[i] += selectedWeight / 2.0
+        weightsLocationC[a_location] = 0
+        weightsLocationC[b_location] = 0
+        c_location = np.random.choice(4, 1, p=weightsLocationC)[0]
+        locations[c_location] = self.objects[2]
+
+        weightsLocationD = [1.0, 1.0, 1.0, 1.0]
+        weightsLocationD[a_location]=0
+        weightsLocationD[b_location] = 0
+        weightsLocationD[c_location] = 0
+        d_location = np.random.choice(4, 1, p=weightsLocationD)[0]
+        locations[d_location] = self.objects[3]
+        res=[]
+        for i in range(4):
+            res.append(locations[i])
+            self.state_toy_locations[locations[i]]=i
+            self.state_locations_toy[i] = locations[i] # access toy type by location
+        return tuple(res)
+
+    def run_env_function(self, cmd, parameter=None, parameter2=None):
+        if cmd == "init_env":
+            obj0, obj1, obj2, pbj3 = self.calc_locations()
+            self.calc_rewards()
+            shell_cmd = 'rosrun task4_env environment_functions.py {} {} {} {} {}'.format(cmd, obj0, obj1, obj2, pbj3)
+            print('init environment with objects, running:"{}"'.format(shell_cmd))
+            # os.system(shell_cmd)
+        if cmd == "pick":
+            shell_cmd = 'rosrun task4_env environment_functions.py {} {}'.format(cmd, parameter)        
+            print(shell_cmd)
+            # os.system(shell_cmd)
+        if cmd == "place":
+            shell_cmd = 'rosrun task4_env environment_functions.py {} {} {}'.format(cmd, parameter, parameter2)
+            print(shell_cmd)
+            # os.system(shell_cmd)
+
+    def add_action(self, skill_name, parameters, observation, reward):
+        self.actions.append((skill_name, parameters))
+        self.observations.append(observation)
+        self.rewards.append((reward))
+        log_msg = "listed- action-{}, observation:{}, reward:{}".format((skill_name, parameters), observation, reward)
+        self.log.append(log_msg)
+        print(log_msg)
+        self.total_reward_msg = "total rewards:{}".format(sum(self.rewards))
+        print(self.total_reward_msg)
+
+    # Service Handlers #
+    def handle_navigate(self, req):
+        original_location = self.state_robot_location
+        self.nav_calls = self.nav_calls+1
+        if self.pick_calls > 6 or self.nav_calls > 8:
+            print("you used more than 6 picks, GAME OVER")
+            self.add_action(skill_name="navigate", parameters="GAME-OVER", observation="GAME-OVER", reward=0)
+            return navigateResponse(success=False);
+            
+        if len(self.actions) == 0:
+            self.run_env_function("init_env")
+
+        locations = [1.25, 0.85, 0.2], [2.25, 0.95, 0.2], [0.15516284108161926, 0.07012523710727692, 0.002471923828125], [3.0, -1.5, 0.2], [1.3, -0.5, 1]
+        do_nav, obs_nav = self.calc_nav_succ(req.location)
+        if do_nav:
+            # client = actionlib.SimpleActionClient('move_base', MoveBaseAction)
+            # client.wait_for_server()
+            # goal = MoveBaseGoal()
+            # goal.target_pose.header.frame_id = "map"
+            # goal.target_pose.header.stamp = rospy.Time.now()
+            # goal.target_pose.pose.position.x = locations[req.location][0]  # req.goal.x
+            # goal.target_pose.pose.position.y = locations[req.location][1]  # req.goal.y
+            # goal.target_pose.pose.position.z = 0  # req.goal.z
+            # goal.target_pose.pose.orientation.w = 1.0
+            # client.send_goal(goal) 
+            # wait = client.wait_for_result()
+            res = navigateResponse(success=False)
+
+            # if not wait:
+            # 	print("----------------not_wait----------------------")
+            # 	rospy.logerr("Action server not available!")
+            # 	rospy.signal_shutdown("Action server not available!")
+            # else:
+                # res.success = client.get_state() == self.SUCCEEDED
+            res.success = True #
+   
+            if self.state_robot_location == req.location:
+                res.success = False
+            self.state_robot_location = req.location
+        print("state_robot_location({}) == req.location({})".format(self.state_robot_location , req.location))        
+        if original_location == req.location:
+            if do_nav != obs_nav:
+                obs_nav=True
+            else:
+                obs_nav=False
+            do_nav=False
+            print("navigate to self location: failed")
+        if do_nav:
+            _reward = -1
+        else:
+            _reward = -2
+        print("success:{}, obs_noise:{},response:{}".format(do_nav,(do_nav != obs_nav), obs_nav))
+        res = navigateResponse(success=obs_nav)
+        self.add_action(skill_name="navigate", parameters=req, observation=res, reward=_reward)
+        return res
+
+    def handle_info(self): # accessible by agent
+        info = "This is how you get your state and reward info. Also how you determine which toy type to send to the pick request (the one at the robots location).\n"+ "\n"
+        info = info + self.get_state() + "\n"+ "\n"
+        info = info + "log:\n" + str(self.log) + "\n\n"
+        info = info + "total rewards:{}".format(sum(self.rewards))
+        return infoResponse(internal_info=info)
+
+    def handle_pick(self, req):
+        self.pick_calls = self.pick_calls + 1    
+        if self.pick_calls > 6 or self.nav_calls > 8:
+            print("you used more than 6, GAME OVER")
+            self.add_action(skill_name="pick", parameters="GAME-OVER", observation="GAME-OVER", reward=0)
+            return pickResponse(success=False)
+        if len(self.actions) == 0:
+            self.run_env_function("init_env")        
+        print('handle_pick')
+        print(req)
+
+        res = None
+        reward = -2
+        if self.state_is_holding or self.state_robot_location == 4:
+            res = pickResponse(success=False)        
+
+        elif req.toy_type not in self.state_toy_locations.keys(): # in case empty location
+            print("Big F")
+            res = pickResponse(success=False)
+                
+        elif self.state_robot_location == self.state_toy_locations[req.toy_type]:
+            self.run_env_function("pick", req.toy_type) 
+            reward = -1
+            res = pickResponse(success=True)
+            self.state_holding_object_name = req.toy_type
+            self.state_is_holding=True
+            self.state_toy_locations[req.toy_type] = 5 # toy in robot arm
+            
+            self.state_locations_toy[self.state_robot_location] = "None"
+            self.state_locations_toy[5] = req.toy_type
+
+        else:
+            res = pickResponse(success=False)
+        print('state_holding_object_name:{}'.format(self.state_holding_object_name))
+
+        self.add_action(skill_name="pick", parameters=req, observation=res, reward=reward)
+        return res
+
+    def handle_place(self, req=None):
+        if self.pick_calls > 6 or self.nav_calls > 8:
+            print("you used more than 6 picks, GAME OVER")
+            self.add_action(skill_name="place", parameters="GAME-OVER", observation="GAME-OVER", reward=0)
+            return placeResponse(success=False)
+        print('state_holding_object_name:{}'.format(self.state_holding_object_name))
+        print('state_robot_location:{}'.format(self.state_robot_location))
+        if len(self.actions) == 0:
+            self.run_env_function("init_env")
+        print('handle_place')
+        print(req)
+        reward = 0
+        res = None
+        if self.state_holding_object_name == None:
+            reward = -3
+            res = placeResponse(success=False)
+        elif self.state_robot_location !=4:
+            reward = -1
+            res = placeResponse(success=False)
+        else:
+            reward = self.state_toy_rewards[self.state_holding_object_name]
+            self.state_toy_locations[self.state_holding_object_name]=self.state_robot_location
+            self.run_env_function("place", self.state_holding_object_name, self.state_robot_location)
+            self.state_holding_object_name=None
+            self.state_locations_toy[5] = None
+            self.state_is_holding = False
+            res = placeResponse(success=True)
+
+        self.add_action(skill_name="place", parameters=req, observation=res, reward=reward)
+        return res
+
+class GeneralReq:
+    pass
+
 class SkillsServer:
     MAX_NAVIGATIONS = 8
     MAX_PICKS = 6
@@ -357,9 +611,11 @@ class SkillsServer:
         self.reset_parameters()
         self.verbose = verbose
         self.process = None
-        self.node = roslaunch.core.Node("task4_env", "skills_server.py", name="skills_server_node", output='log')
-        self.launcher = roslaunch.scriptapi.ROSLaunch()
-        self.launcher.start()
+        # future: revert   
+        # self.node = roslaunch.core.Node("task4_env", "skills_server.py", name="skills_server_node", output='log')
+        # self.launcher = roslaunch.scriptapi.ROSLaunch()
+        # self.launcher.start()
+        self.server_simulator = ServerSimulator()
     
     def reset_parameters(self):
         self.navigations_left = SkillsServer.MAX_NAVIGATIONS
@@ -367,18 +623,20 @@ class SkillsServer:
     
     # Operation #
     def kill(self):
-        self.process.stop() if self.process else os.system("rosnode kill skills_server_node")
+        # future: revert
+          # self.process.stop() if self.process else os.system("rosnode kill skills_server_node")
         self.process = None
     
     def launch(self):
         self.reset_parameters()
         
-        self.launcher.launch(self.node)
-        # wait for services launched in server
-        rospy.wait_for_service('info')
-        rospy.wait_for_service('navigate')
-        rospy.wait_for_service('pick')
-        rospy.wait_for_service('place')
+          # future: revert
+        # self.launcher.launch(self.node)
+        # # wait for services launched in server
+        # rospy.wait_for_service('info')
+        # rospy.wait_for_service('navigate')
+        # rospy.wait_for_service('pick')
+        # rospy.wait_for_service('place')
 
     def relaunch(self):
         self.kill()
@@ -419,34 +677,44 @@ class SkillsServer:
         return Info(state, toys_reward, log, total_reward)
 
     # Service Calls #
+    # future: revert all to call service
     def call_navigate(self, location) -> bool:
         try:
-            navigate_srv = rospy.ServiceProxy('navigate', navigate)
-            resp = navigate_srv(location)
+            # navigate_srv = rospy.ServiceProxy('navigate', navigate)
+            # resp = navigate_srv(location)
+            req = GeneralReq()
+            req.location = location
+            pprint.pprint(req)
+            resp = self.server_simulator.handle_navigate(req)
             return resp.success
         except rospy.ServiceException as e:
             print("Service call failed: %s"%e)
 
     def call_pick(self, toy_type) -> bool:
         try:
-            pick_srv = rospy.ServiceProxy('pick', pick)
-            resp = pick_srv(toy_type)
+            # pick_srv = rospy.ServiceProxy('pick', pick)
+            # resp = pick_srv(toy_type)
+            req = GeneralReq()
+            req.toy_type = toy_type
+            resp = self.server_simulator.handle_pick(req)            
             return resp.success
         except rospy.ServiceException as e:
             print("Service call failed: %s"%e)
 
     def call_place(self) -> bool:
         try:
-            place_srv = rospy.ServiceProxy('place', place)
-            resp = place_srv()
+            # place_srv = rospy.ServiceProxy('place', place)
+            # resp = place_srv()
+            resp = self.server_simulator.handle_place()  
             return resp.success
         except rospy.ServiceException as e:
             print("Service call failed: %s"%e)
 
     def call_info(self) -> str:
         try:
-            info_srv = rospy.ServiceProxy('info', info)
-            resp = info_srv()
+            # info_srv = rospy.ServiceProxy('info', info)
+            # resp = info_srv()
+            resp = self.server_simulator.handle_info()  
             return resp.internal_info
         except rospy.ServiceException as e:
             print("Service call failed: %s"%e)
