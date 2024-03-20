@@ -820,8 +820,6 @@ class QTable:
         # Eps-Greedy policy
         state_records = self.get_state_records(state)
         if not state_records:
-            if verbose:
-                print(f"No actions for state: {state}")
             return None
 
         if verbose:
