@@ -93,9 +93,6 @@ def check_if_pick_exist_in_q_table_for_relevant_state(q_table: QTable):
     state = State(0, State.toy_locations_to_dict(3, 2, 0, 1), 7, 6)
     QTable.print_q_table_formated_dict(q_table.get_state_records(state))
 
-def test_info_update():
-    pass # todo
-
 ### q_table get reward and max item ###
 def test_get_reward_and_max_record():
     q_table = QTable(INITAL_Q_TABLE_FILE_NAME)
@@ -118,6 +115,6 @@ def test_get_reward_and_max_record():
 
 ### Main ###
 if __name__ == "__main__":
-    q_table = QTable(INITAL_Q_TABLE_FILE_NAME)
-    check_if_pick_exist_in_q_table_for_relevant_state(q_table)
+    file_name = ExperimentRunner.MOST_RECENT_Q_TABLE_FILE_NAME
+    load_q_table_and_print_only_updated_records(file_name)
     

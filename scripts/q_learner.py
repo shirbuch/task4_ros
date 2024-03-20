@@ -575,11 +575,13 @@ class QTable:
             if not state_action.is_reasonable():
                 raise Exception(f"Not reasonable record in q_table:\n{state_action}")
 
+
 ### Experiment Runner ###
 class ExperimentRunner:
     # future: update
     LEARNING_MODE_ITERATIONS = 3
     EXECUTE_MODE_ITERATIONS = 3 # future: 10
+    MOST_RECENT_Q_TABLE_FILE_NAME = "most_recent_q_table.pkl"
     
     def __init__(self, skills_server: SkillsServer, learning_mode=False, import_file_name=None, export_file_name=None, export_rate=5, verbose=None): # future: change file name
         self.skills_server = skills_server 
@@ -608,15 +610,20 @@ class ExperimentRunner:
     
     def run_control(self): 
         state, action = self.get_state_and_next_action()
-        while action is not None:          
+        prev_total_reward = self.skills_server.get_info().total_reward
+        while action is not None:
             action.perform(self.skills_server)
 
-            if self.learning_mode:
+            if self.learning_mode:                
                 total_reward = self.skills_server.get_info().total_reward
-                self.q_table.update(state, action, total_reward)
+                action_reward = total_reward - prev_total_reward
+                
+                self.q_table.update(state, action, action_reward)
                 if self.verbose:
-                    print(f"Updated {state}, {action} -> {total_reward}")
-
+                    print(f"Updated {state}, {action} -> {action_reward}")
+        
+                prev_total_reward = total_reward
+        
             state, action = self.get_state_and_next_action()
 
     def run_experiment(self):
@@ -655,7 +662,9 @@ class ExperimentRunner:
         # Export the final q_table
         if self.learning_mode:
             file_path = self.q_table.export(self.export_file_name)
-            print(f"Final Q-table exported to: {file_path}\n\n")
+            print(f"Final Q-table exported to: {file_path}")
+            file_path = self.q_table.export(ExperimentRunner.MOST_RECENT_Q_TABLE_FILE_NAME)
+            print(f"Most recent Q-table can also be found in: {file_path}\n\n")
 
 
 ### Main ###
@@ -672,9 +681,10 @@ def main():
         return
     print(f"\n\n##### {'LEARNING' if learning_mode else 'EXECUTING'} #####\n\n")
     
-    skills_server = SkillsServer(verbose=not learning_mode)
+    skills_server = SkillsServer(verbose=True) # future: =not learning_mode
     try:
-        experimentRunner = ExperimentRunner(skills_server, learning_mode, import_file_name="initial_q_table.pkl")
+        import_file_name = ExperimentRunner.MOST_RECENT_Q_TABLE_FILE_NAME
+        experimentRunner = ExperimentRunner(skills_server, learning_mode, import_file_name=import_file_name, export_rate=1, verbose=True) # future: =not learning_mode
         experimentRunner.run_experiment()
     finally:
         skills_server.kill()
