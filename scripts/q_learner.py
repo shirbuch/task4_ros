@@ -391,16 +391,16 @@ class ServerSimulator:
         self.state_toy_rewards[self.objects[2]] = self.rewards[c_reward]
         d_reward = 3
         self.state_toy_rewards[self.objects[3]] = self.rewards[d_reward]
-        print("rewards:")
-        print(self.state_toy_rewards)
+        # print("rewards:")
+        # print(self.state_toy_rewards)
 
     def calc_nav_succ(self, location): # navigate fails, the no motion is executed in gazebo (state does not change, nav counter +1)
         weightsSuccess = [0.8,0.85,0.9,0.75,1.0] # navigation success is dependent on the location
         weightsObs = [1.0,1.0,1.0,1.0,1.0] # nav success is always observed correctly	
         succ = random.random() <= weightsSuccess[location]
         obs = random.random() <= weightsObs[location]
-        print("sampled navigate real obs:{}".format(obs))
-        print("sampled navigate succ:{}".format(succ))
+        # print("sampled navigate real obs:{}".format(obs))
+        # print("sampled navigate succ:{}".format(succ))
         if obs:
             return (succ,succ)
         else:
@@ -447,15 +447,15 @@ class ServerSimulator:
             obj0, obj1, obj2, pbj3 = self.calc_locations()
             self.calc_rewards()
             shell_cmd = 'rosrun task4_env environment_functions.py {} {} {} {} {}'.format(cmd, obj0, obj1, obj2, pbj3)
-            print('init environment with objects, running:"{}"'.format(shell_cmd))
+            # print('init environment with objects, running:"{}"'.format(shell_cmd))
             # os.system(shell_cmd)
         if cmd == "pick":
             shell_cmd = 'rosrun task4_env environment_functions.py {} {}'.format(cmd, parameter)        
-            print(shell_cmd)
+            # print(shell_cmd)
             # os.system(shell_cmd)
         if cmd == "place":
             shell_cmd = 'rosrun task4_env environment_functions.py {} {} {}'.format(cmd, parameter, parameter2)
-            print(shell_cmd)
+            # print(shell_cmd)
             # os.system(shell_cmd)
 
     def add_action(self, skill_name, parameters, observation, reward):
@@ -464,16 +464,16 @@ class ServerSimulator:
         self.rewards.append((reward))
         log_msg = "listed- action-{}, observation:{}, reward:{}".format((skill_name, parameters), observation, reward)
         self.log.append(log_msg)
-        print(log_msg)
-        self.total_reward_msg = "total rewards:{}".format(sum(self.rewards))
-        print(self.total_reward_msg)
+        # print(log_msg)
+        # self.total_reward_msg = "total rewards:{}".format(sum(self.rewards))
+        # print(self.total_reward_msg)
 
     # Service Handlers #
     def handle_navigate(self, req):
         original_location = self.state_robot_location
         self.nav_calls = self.nav_calls+1
         if self.pick_calls > 6 or self.nav_calls > 8:
-            print("you used more than 6 picks, GAME OVER")
+            # print("you used more than 6 picks, GAME OVER")
             self.add_action(skill_name="navigate", parameters="GAME-OVER", observation="GAME-OVER", reward=0)
             return navigateResponse(success=False);
             
@@ -507,19 +507,19 @@ class ServerSimulator:
             if self.state_robot_location == req.location:
                 res.success = False
             self.state_robot_location = req.location
-        print("state_robot_location({}) == req.location({})".format(self.state_robot_location , req.location))        
+        # print("state_robot_location({}) == req.location({})".format(self.state_robot_location , req.location))        
         if original_location == req.location:
             if do_nav != obs_nav:
                 obs_nav=True
             else:
                 obs_nav=False
             do_nav=False
-            print("navigate to self location: failed")
+            # print("navigate to self location: failed")
         if do_nav:
             _reward = -1
         else:
             _reward = -2
-        print("success:{}, obs_noise:{},response:{}".format(do_nav,(do_nav != obs_nav), obs_nav))
+        # print("success:{}, obs_noise:{},response:{}".format(do_nav,(do_nav != obs_nav), obs_nav))
         res = navigateResponse(success=obs_nav)
         self.add_action(skill_name="navigate", parameters=req, observation=res, reward=_reward)
         return res
@@ -534,13 +534,13 @@ class ServerSimulator:
     def handle_pick(self, req):
         self.pick_calls = self.pick_calls + 1    
         if self.pick_calls > 6 or self.nav_calls > 8:
-            print("you used more than 6, GAME OVER")
+            # print("you used more than 6, GAME OVER")
             self.add_action(skill_name="pick", parameters="GAME-OVER", observation="GAME-OVER", reward=0)
             return pickResponse(success=False)
         if len(self.actions) == 0:
             self.run_env_function("init_env")        
-        print('handle_pick')
-        print(req)
+        # print('handle_pick')
+        # print(req)
 
         res = None
         reward = -2
@@ -548,7 +548,7 @@ class ServerSimulator:
             res = pickResponse(success=False)        
 
         elif req.toy_type not in self.state_toy_locations.keys(): # in case empty location
-            print("Big F")
+            # print("Big F")
             res = pickResponse(success=False)
                 
         elif self.state_robot_location == self.state_toy_locations[req.toy_type]:
@@ -564,22 +564,21 @@ class ServerSimulator:
 
         else:
             res = pickResponse(success=False)
-        print('state_holding_object_name:{}'.format(self.state_holding_object_name))
+        # print('state_holding_object_name:{}'.format(self.state_holding_object_name))
 
         self.add_action(skill_name="pick", parameters=req, observation=res, reward=reward)
         return res
 
     def handle_place(self, req=None):
         if self.pick_calls > 6 or self.nav_calls > 8:
-            print("you used more than 6 picks, GAME OVER")
+            # print("you used more than 6 picks, GAME OVER")
             self.add_action(skill_name="place", parameters="GAME-OVER", observation="GAME-OVER", reward=0)
             return placeResponse(success=False)
-        print('state_holding_object_name:{}'.format(self.state_holding_object_name))
-        print('state_robot_location:{}'.format(self.state_robot_location))
+        # print('state_holding_object_name:{}'.format(self.state_holding_object_name))
+        # print('state_robot_location:{}'.format(self.state_robot_location))
         if len(self.actions) == 0:
             self.run_env_function("init_env")
-        print('handle_place')
-        print(req)
+        # print('handle_place')
         reward = 0
         res = None
         if self.state_holding_object_name == None:
@@ -684,7 +683,6 @@ class SkillsServer:
             # resp = navigate_srv(location)
             req = GeneralReq()
             req.location = location
-            pprint.pprint(req)
             resp = self.server_simulator.handle_navigate(req)
             return resp.success
         except rospy.ServiceException as e:
