@@ -165,12 +165,16 @@ def init_all_from_scratch():
 def check_something_on_table():
     q_table = QTable(MOST_RECENT_Q_TABLE_FILE_NAME)
         
-    print_num_updated_records()
+    for state_action, reward  in q_table.q_table.items():
+        if state_action.state.picks_left == 0 or state_action.state.picks_left == 1 or state_action.state.picks_left == 0:
+            print(f"State: {state_action.state}, Action: {state_action.action}")
  
 ### Main ###
 if __name__ == "__main__":        
     # copy_table()
-    run(learning_mode=True, iterations=100, export_rate=5)
+    # run(learning_mode=True, iterations=100, export_rate=5)
     # print_updated_records()
 
+    check_something_on_table()
+    
     pass

@@ -626,7 +626,7 @@ class SkillsServer:
     MAX_NAVIGATIONS = 8
     MAX_PICKS = 6
     
-    def __init__(self, verbose=True):
+    def __init__(self, verbose=False):
         self.navigations_left = SkillsServer.MAX_NAVIGATIONS
         self.picks_left = SkillsServer.MAX_PICKS
         self.verbose = verbose
@@ -907,19 +907,22 @@ class QTable:
 ### Experiment Runner ###
 class ExperimentRunner:
     DEFAULT_MOST_RECENT_Q_TABLE_FILE_NAME = "most_recent_q_table.pkl" # future: update
+    DEFAULT_LEARNING_ITERATIONS = 100 # future: update
+    DEFAULT_EXPORT_RATE = 5 # future: update
+    EXPERIMENT_ITERATIONS = 10
     
-    def __init__(self, skills_server: SkillsServer, import_file_name=None, verbose=None, learning_mode=False, iterations=20, export_file_name=None, export_rate=5): # future: change file name
+    def __init__(self, skills_server: SkillsServer, import_file_name=None, verbose=None, learning_mode=False, iterations=None, export_file_name=None, export_rate=None): # future: change file name
         self.skills_server = skills_server
         self.q_table = QTable(import_file_name) # future: check if learning_mode means starting with empty q_table      
         self.verbose = not learning_mode if verbose is None else verbose
         
         self.learning_mode = learning_mode
         if learning_mode:
-            self.iterations = iterations if iterations is not None else ExperimentRunner.DEFAULT_LEARNING_MODE_ITERATIONS
+            self.iterations = iterations if iterations is not None else ExperimentRunner.DEFAULT_LEARNING_ITERATIONS
             self.export_file_name = export_file_name if export_file_name is not None else ExperimentRunner.DEFAULT_MOST_RECENT_Q_TABLE_FILE_NAME # backlog: check file exists
-            self.export_rate = export_rate # Export the q_table once every 'export_rate' iterations
+            self.export_rate = export_rate if export_rate is not None else ExperimentRunner.DEFAULT_EXPORT_RATE # Export the q_table once every 'export_rate' iterations
         else:
-            self.iterations = iterations if iterations is not None else 10
+            self.iterations = iterations if iterations is not None else ExperimentRunner.EXPERIMENT_ITERATIONS
         
     def reset_env(self):
         # Assumes skills_server is already running
@@ -952,6 +955,7 @@ class ExperimentRunner:
             if self.learning_mode:
                 self.q_table.fit(state, action, action_reward, next_state)
             if self.verbose:
+                print(f"Performed Action: {action}")
                 print(f"Action Reward: {action_reward}")
                 print(f"Total reward: {total_reward}\n")
             
@@ -1008,11 +1012,10 @@ def get_learning_mode_from_args() -> bool:
     except:
         return None
 
-def run(learning_mode=True, verbose=False, iterations=20, export_rate=5):
-    skills_server = SkillsServer(verbose) # future: =not learning_mode
+def run(learning_mode=True, iterations=None, export_rate=None):
+    skills_server = SkillsServer()
     try:
-        # Learning mode
-        experimentRunner = ExperimentRunner(skills_server, import_file_name=ExperimentRunner.DEFAULT_MOST_RECENT_Q_TABLE_FILE_NAME, verbose=verbose, learning_mode=learning_mode, iterations=iterations, export_file_name=ExperimentRunner.DEFAULT_MOST_RECENT_Q_TABLE_FILE_NAME, export_rate=export_rate) # future: =not learning_mode
+        experimentRunner = ExperimentRunner(skills_server, learning_mode=learning_mode, iterations=iterations, export_rate=export_rate)
         experimentRunner.run_experiment()
     finally:
         skills_server.kill()
@@ -1024,7 +1027,7 @@ def main():
         return
     print(f"\n\n##### {'LEARNING' if learning_mode else 'EXECUTING'} #####\n\n") 
     
-    run(learning_mode, verbose=not learning_mode)
+    run(learning_mode)
 
 if __name__ == '__main__':
     main()
