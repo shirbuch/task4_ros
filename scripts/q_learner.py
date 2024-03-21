@@ -846,7 +846,17 @@ class QTable:
         self.q_table[StateAction(state, action)] = reward
 
     def fit(self, state: State, action: Action, action_reward: int, next_state: State):
-        self.update(state, action, action_reward)
+        # todo: make sure that Q(s,a) is meant to be self.get_reward(state, action)
+        current_state_action_reward = self.get_reward(state, action)
+        next_state_records = self.get_state_records(next_state)
+        if not next_state_records:
+            max_next_state_action_reward = 0
+        else:
+            max_next_state_action = QTable.get_max_record_from_q_table_formated_dict(next_state_records)
+            max_next_state_action_reward = max_next_state_action[1]
+        
+        reward = (1 - QTable.ALPHA)*current_state_action_reward + QTable.ALPHA*(action_reward + QTable.GAMMA*max_next_state_action_reward)
+        self.update(state, action, reward)
     
     @staticmethod
     def get_max_record_from_q_table_formated_dict(state_records: dict) -> tuple:
