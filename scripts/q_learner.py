@@ -931,7 +931,6 @@ class ExperimentRunner:
             
             total_reward = self.skills_server.get_info().total_reward
             action_reward = total_reward - prev_total_reward
-            prev_total_reward = total_reward
 
             if self.learning_mode:                
                 self.q_table.update(state, action, action_reward)
@@ -940,6 +939,7 @@ class ExperimentRunner:
                 print(f"Action Reward: {action_reward}")
                 print(f"Total reward: {total_reward}\n")
             
+            prev_total_reward = total_reward
             state, action = self.get_state_and_next_action()
 
     def run_experiment(self):
@@ -992,12 +992,11 @@ def get_learning_mode_from_args() -> bool:
     except:
         return None
 
-def run(learning_mode, verbose=False):
+def run(learning_mode=True, verbose=False, iterations=20, export_rate=5):
     skills_server = SkillsServer(verbose) # future: =not learning_mode
     try:
         # Learning mode
-        experimentRunner = ExperimentRunner(skills_server, import_file_name=ExperimentRunner.DEFAULT_MOST_RECENT_Q_TABLE_FILE_NAME, learning_mode=learning_mode, \
-            export_file_name=ExperimentRunner.DEFAULT_MOST_RECENT_Q_TABLE_FILE_NAME, verbose=verbose) # future: =not learning_mode
+        experimentRunner = ExperimentRunner(skills_server, import_file_name=ExperimentRunner.DEFAULT_MOST_RECENT_Q_TABLE_FILE_NAME, verbose=verbose, learning_mode=learning_mode, iterations=iterations, export_file_name=ExperimentRunner.DEFAULT_MOST_RECENT_Q_TABLE_FILE_NAME, export_rate=export_rate) # future: =not learning_mode
         experimentRunner.run_experiment()
     finally:
         skills_server.kill()
@@ -1008,9 +1007,8 @@ def main():
         print("Please provide learning mode as an argument (0 or 1)")
         return
     print(f"\n\n##### {'LEARNING' if learning_mode else 'EXECUTING'} #####\n\n") 
-    verbose = not learning_mode
     
-    run(learning_mode, verbose)
+    run(learning_mode, verbose=not learning_mode)
 
 if __name__ == '__main__':
     main()

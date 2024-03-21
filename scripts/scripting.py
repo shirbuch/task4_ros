@@ -172,7 +172,7 @@ if __name__ == "__main__":
     # print_table()
         
     # copy_table()
-    run(learning_mode=True)
+    run(learning_mode=True, iterations=20, export_rate=5)
         
     # print_updated_records()
     # print_table()
