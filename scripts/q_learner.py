@@ -993,7 +993,7 @@ class ExperimentRunner:
             total_reward = info.total_reward
             total_rewards.append(total_reward)
                 
-            print(f"========== Finished {i+1}, Total reward: {total_reward} =========\n\n")
+            print(f"========== Finished {i+1}, Total reward: {total_reward} =========")
             
             if self.learning_mode and i % self.export_rate == 0:
                 file_path = self.q_table.export(self.export_file_path)
