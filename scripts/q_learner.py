@@ -748,6 +748,8 @@ class QTable:
 
     INIT_VALUE = 0
     EPS = 0.1
+    ALPHA = 0.01
+    GAMMA = 0.95
 
     def __init__(self, file_name=None):
         if file_name is None:
@@ -843,6 +845,9 @@ class QTable:
     def update(self, state: State, action: Action, reward: int):
         self.q_table[StateAction(state, action)] = reward
 
+    def fit(self, state: State, action: Action, action_reward: int, next_state: State):
+        self.update(state, action, action_reward)
+    
     @staticmethod
     def get_max_record_from_q_table_formated_dict(state_records: dict) -> tuple:
         return max(state_records.items(), key=lambda item: item[1])
@@ -929,12 +934,13 @@ class ExperimentRunner:
         while action is not None:
             action.perform(self.skills_server)
             
-            total_reward = self.skills_server.get_info().total_reward
+            info = self.skills_server.get_info()
+            next_state = info.state
+            total_reward = info.total_reward
             action_reward = total_reward - prev_total_reward
 
-            if self.learning_mode:                
-                self.q_table.update(state, action, action_reward)
-                
+            if self.learning_mode:
+                self.q_table.fit(state, action, action_reward, next_state)
             if self.verbose:
                 print(f"Action Reward: {action_reward}")
                 print(f"Total reward: {total_reward}\n")
