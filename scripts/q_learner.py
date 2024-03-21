@@ -900,15 +900,17 @@ class ExperimentRunner:
     DEFAULT_EXPORT_RATE = 1
     EXPERIMENT_ITERATIONS = 10
     
-    def __init__(self, skills_server: SkillsServer, import_file_path=None, verbose=None, learning_mode=False, iterations=None, export_file_name=None, export_rate=None):
+    def __init__(self, skills_server: SkillsServer, import_file_path=None, verbose=None, learning_mode=False, iterations=None, export_file_path=None, export_rate=None):
         self.skills_server = skills_server
-        self.q_table = QTable(import_file_path)     
+        if import_file_path is None or not os.path.exists(import_file_path):
+            raise Exception(f"Q-table file does not exist at: {import_file_path}, please update the path in Q_TABLE_FILE_PATH constant in q_learner.py (or make sure to run from the relative dir to the file)")
+        self.q_table = QTable(import_file_path)
         self.verbose = not learning_mode if verbose is None else verbose
         
         self.learning_mode = learning_mode
         if learning_mode:
             self.iterations = iterations if iterations is not None else ExperimentRunner.DEFAULT_LEARNING_ITERATIONS
-            self.export_file_path = export_file_name if export_file_name is not None else Q_TABLE_FILE_PATH # backlog: check file exists
+            self.export_file_path = export_file_path if export_file_path is not None else Q_TABLE_FILE_PATH # backlog: check file exists
             self.export_rate = export_rate if export_rate is not None else ExperimentRunner.DEFAULT_EXPORT_RATE
         else:
             self.iterations = iterations if iterations is not None else ExperimentRunner.EXPERIMENT_ITERATIONS
@@ -955,7 +957,9 @@ class ExperimentRunner:
     def run_experiment(self):
         self.skills_server.relaunch()
 
-        prev_updated_records = self.q_table.get_num_updated_records()
+        if self.learning_mode:
+            prev_updated_records = self.q_table.get_num_updated_records()
+    
         total_rewards = []
         for i in range(self.iterations):
             self.reset_env()
@@ -980,6 +984,7 @@ class ExperimentRunner:
                 print(f"Re-exported table to: {file_path}")
         
         print(f"\n\n========== Finished Experiment =========")
+
         if self.learning_mode:
             file_path = self.q_table.export(self.export_file_path)
             print(f"Most recent Q-table can also be found in: {file_path}")
@@ -999,7 +1004,7 @@ def get_learning_mode_from_args() -> bool:
     except:
         return None
 
-def run(learning_mode=True, iterations=None, export_rate=None):
+def run(learning_mode, iterations=None, export_rate=None):
     skills_server = SkillsServer()
     try:
         experimentRunner = ExperimentRunner(skills_server, import_file_path=Q_TABLE_FILE_PATH, learning_mode=learning_mode, iterations=iterations, export_rate=export_rate)
