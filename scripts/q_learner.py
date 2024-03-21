@@ -822,6 +822,9 @@ class QTable:
                 updated_records[state_action] = reward
         return updated_records
     
+    def get_num_updated_records(self) -> int:
+        return len(self.get_updated_records())
+    
     @staticmethod
     def generate_file_name():
         return "q_table_" + datetime.datetime.now().strftime("%d-%m_%H-%M") + ".pkl"
@@ -905,7 +908,8 @@ class ExperimentRunner:
         
     def reset_env(self):
         # Assumes skills_server is already running
-        print(f"========== reset env =========")
+        if self.verbose:
+            print(f"========== reset env =========")
 
         # Spawn toys and start at the baby
         if not self.skills_server.navigate(4):
@@ -941,14 +945,16 @@ class ExperimentRunner:
     def run_experiment(self):
         self.skills_server.relaunch()
 
+        prev_updated_records = self.q_table.get_num_updated_records()
         total_rewards = []
         for i in range(self.iterations):
             self.reset_env()
 
-            info = self.skills_server.get_info()
-            print(f"\n\n========== ITERATION {i+1} =========")
-            print(f"Initial state: {info.state}")
-            print(f"Toys rewards: {info.toys_reward}")
+            if self.verbose:
+                info = self.skills_server.get_info()
+                print(f"\n\n========== ITERATION {i+1} =========")
+                print(f"Initial state: {info.state}")
+                print(f"Toys rewards: {info.toys_reward}")
 
             self.run_control()
             
@@ -966,15 +972,17 @@ class ExperimentRunner:
                 file_path = self.q_table.export(self.export_file_name)
                 print(f"Re-exported table to: {file_path}")
         
-        print(f"\n\n========== Finished All =========")
-        if not self.learning_mode:
-            average_reward = sum(total_rewards) / len(total_rewards)
-            print(f"Average reward: {average_reward}\n")
-        
-        # Export the final q_table
+        print(f"\n\n========== Finished Experimnet =========")
         if self.learning_mode:
             file_path = self.q_table.export(self.export_file_name)
-            print(f"Most recent Q-table can also be found in: {file_path}\n\n")
+            print(f"Most recent Q-table can also be found in: {file_path}")
+            
+            updated_records = self.q_table.get_num_updated_records()
+            print(f"Updated records: {updated_records - prev_updated_records}")
+        else:
+            average_reward = sum(total_rewards) / len(total_rewards)
+            print(f"Average reward: {average_reward}")        
+        print()
 
 
 ### Main ###

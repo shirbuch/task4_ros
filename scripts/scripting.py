@@ -1,3 +1,4 @@
+from turtle import up, update
 from q_learner import *
 
 skills_server = SkillsServer()
@@ -164,24 +165,16 @@ def init_all_from_scratch():
 def check_something_on_table():
     q_table = QTable(MOST_RECENT_Q_TABLE_FILE_NAME)
         
-    wanted_records = {}
-    for state_action, reward in q_table.q_table.items():
-        if state_action.state == EXISTING_STATE_ACTION.state:
-            wanted_records[state_action] = reward
-    
-    print("\nPick records:")
-    QTable.print_q_table_formated_dict(wanted_records)
-        
+    print_num_updated_records()
+ 
 ### Main ###
 if __name__ == "__main__":
     # print_table()
-    
-    # check_something_on_table()
-    
-    copy_table()
+        
+    # copy_table()
     run(learning_mode=True)
-    print_updated_records()
+        
+    # print_updated_records()
     # print_table()
-    # check_no_double_key()
 
     pass
