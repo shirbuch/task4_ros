@@ -1,4 +1,3 @@
-from turtle import up, update
 from q_learner import *
 
 skills_server = SkillsServer()

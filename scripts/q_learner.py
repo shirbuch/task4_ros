@@ -8,12 +8,13 @@ import os
 import roslaunch
 from task4_env.srv import *
 import pickle
-# future: revert
 import random
 from geometry_msgs.msg import Point
-from task4_env.srv import navigate, navigateResponse, pick, pickResponse, place, placeResponse, info, infoResponse  #
+from task4_env.srv import navigate, navigateResponse, pick, pickResponse, place, placeResponse, info, infoResponse
 import numpy as np
 
+# Important! Run the code from the catkin/src folder, or update this path
+Q_TABLE_FILE_PATH = "task4_env/most_recent_q_table.pkl"
 
 ### Constants ###
 class Locations:
@@ -112,7 +113,6 @@ class Action:
             return skills_server.place()
     
 class State:
-    # Beware! duplicated from SkillsServer because of future declerations
     MAX_NAVIGATIONS = 8
     MAX_PICKS = 6
 
@@ -361,7 +361,7 @@ class Info:
         return f"State: {self.state}, Toys reward: {self.toys_reward}, Log: {self.log}, Total reward: {self.total_reward}"
 
 ### Server Simulator ###
-# future: delete
+# revert
 class ServerSimulator:
     def __init__(self):
         self.SUCCEEDED = 3
@@ -630,7 +630,7 @@ class SkillsServer:
         self.navigations_left = SkillsServer.MAX_NAVIGATIONS
         self.picks_left = SkillsServer.MAX_PICKS
         self.verbose = verbose
-        # future: revert   
+        # revert   
         # self.node = roslaunch.core.Node("task4_env", "skills_server.py", name="skills_server_node", output='log')
         # self.launcher = roslaunch.scriptapi.ROSLaunch()
         # self.launcher.start()
@@ -641,19 +641,19 @@ class SkillsServer:
         self.navigations_left = SkillsServer.MAX_NAVIGATIONS
         self.picks_left = SkillsServer.MAX_PICKS
         
-        # future: revert
+        # revert
         self.server_simulator.reset()
     
     # Operation #
     def kill(self):
-        # future: revert
+        # revert
           # self.process.stop() if self.process else os.system("rosnode kill skills_server_node")
         self.process = None
     
     def launch(self):
         self.reset_parameters()
         
-        # future: revert
+        # revert
         # self.launcher.launch(self.node)
         # # wait for services launched in server
         # rospy.wait_for_service('info')
@@ -700,7 +700,7 @@ class SkillsServer:
         return Info(state, toys_reward, log, total_reward)
 
     # Service Calls #
-    # future: revert all to call service
+    # revert all to call service
     def call_navigate(self, location) -> bool:
         try:
             # navigate_srv = rospy.ServiceProxy('navigate', navigate)
@@ -752,18 +752,12 @@ class QTable:
     alpha = 0.01
     GAMMA = 0.95
 
-    def __init__(self, file_name=None):
-        if file_name is None:
+    def __init__(self, file_path=None):
+        if file_path is None or not os.path.exists(file_path):
             self.create_initial_q_table()
         else:
-            file_dir="task4_env/q_tables/"  # future: change file_dir from assuming running from src folder
-            file_path = file_dir + file_name
-            
-            if not os.path.exists(file_path):
-                self.create_initial_q_table()
-            else:
-                with open(file_path, 'rb') as f:
-                    self.q_table = pickle.load(f)
+            with open(file_path, 'rb') as f:
+                self.q_table = pickle.load(f)
         
     @staticmethod
     def print_q_table_formated_dict(q_table_formated_dict: dict, skip_printing_factor=1, what_to_print="all"):
@@ -832,12 +826,7 @@ class QTable:
     def generate_file_name():
         return "q_table_" + datetime.datetime.now().strftime("%d-%m_%H-%M") + ".pkl"
     
-    def export(self, file_name=None):
-        if file_name is None:
-            file_name = QTable.generate_file_name()
-        file_dir="task4_env/q_tables/" # future: change from assuming running from src folder
-        file_path = file_dir + file_name
-
+    def export(self, file_path):
         with open(file_path, 'wb') as f:
             pickle.dump(self.q_table, f)
         
@@ -847,7 +836,6 @@ class QTable:
         self.q_table[StateAction(state, action)] = reward
 
     def fit(self, state: State, action: Action, action_reward: int, next_state: State):
-        # todo: make sure that Q(s,a) is meant to be self.get_reward(state, action)
         current_state_action_reward = self.get_reward(state, action)
         next_state_records = self.get_state_records(next_state)
         if not next_state_records:
@@ -907,21 +895,20 @@ class QTable:
 
 ### Experiment Runner ###
 class ExperimentRunner:
-    DEFAULT_MOST_RECENT_Q_TABLE_FILE_NAME = "most_recent_q_table.pkl" # future: update
-    DEFAULT_LEARNING_ITERATIONS = 100 # future: update
-    DEFAULT_EXPORT_RATE = 5 # future: update
+    DEFAULT_LEARNING_ITERATIONS = 10
+    DEFAULT_EXPORT_RATE = 1
     EXPERIMENT_ITERATIONS = 10
     
-    def __init__(self, skills_server: SkillsServer, import_file_name=None, verbose=None, learning_mode=False, iterations=None, export_file_name=None, export_rate=None): # future: change file name
+    def __init__(self, skills_server: SkillsServer, import_file_path=None, verbose=None, learning_mode=False, iterations=None, export_file_name=None, export_rate=None):
         self.skills_server = skills_server
-        self.q_table = QTable(import_file_name) # future: check if learning_mode means starting with empty q_table      
+        self.q_table = QTable(import_file_path)     
         self.verbose = not learning_mode if verbose is None else verbose
         
         self.learning_mode = learning_mode
         if learning_mode:
             self.iterations = iterations if iterations is not None else ExperimentRunner.DEFAULT_LEARNING_ITERATIONS
-            self.export_file_name = export_file_name if export_file_name is not None else ExperimentRunner.DEFAULT_MOST_RECENT_Q_TABLE_FILE_NAME # backlog: check file exists
-            self.export_rate = export_rate if export_rate is not None else ExperimentRunner.DEFAULT_EXPORT_RATE # Export the q_table once every 'export_rate' iterations
+            self.export_file_path = export_file_name if export_file_name is not None else Q_TABLE_FILE_PATH # backlog: check file exists
+            self.export_rate = export_rate if export_rate is not None else ExperimentRunner.DEFAULT_EXPORT_RATE
         else:
             self.iterations = iterations if iterations is not None else ExperimentRunner.EXPERIMENT_ITERATIONS
         
@@ -988,14 +975,13 @@ class ExperimentRunner:
                 print(f"\nFinal state: {info.state}")
                 print(f"========== Finished {i+1}, Total reward: {total_reward} =========\n\n")
             
-            # Export q_table once every 'self.export_rate' iterations
             if self.learning_mode and i % self.export_rate == 0:
-                file_path = self.q_table.export(self.export_file_name)
+                file_path = self.q_table.export(self.export_file_path)
                 print(f"Re-exported table to: {file_path}")
         
         print(f"\n\n========== Finished Experimnet =========")
         if self.learning_mode:
-            file_path = self.q_table.export(self.export_file_name)
+            file_path = self.q_table.export(self.export_file_path)
             print(f"Most recent Q-table can also be found in: {file_path}")
             
             updated_records = self.q_table.get_num_updated_records()
@@ -1016,7 +1002,7 @@ def get_learning_mode_from_args() -> bool:
 def run(learning_mode=True, iterations=None, export_rate=None):
     skills_server = SkillsServer()
     try:
-        experimentRunner = ExperimentRunner(skills_server, learning_mode=learning_mode, iterations=iterations, export_rate=export_rate)
+        experimentRunner = ExperimentRunner(skills_server, import_file_path=Q_TABLE_FILE_PATH, learning_mode=learning_mode, iterations=iterations, export_rate=export_rate)
         experimentRunner.run_experiment()
     finally:
         skills_server.kill()
