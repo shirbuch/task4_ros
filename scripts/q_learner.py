@@ -16,6 +16,8 @@ import numpy as np
 # Important! Run the code from the catkin/src folder, or update this path
 Q_TABLE_FILE_PATH = "task4_env/most_recent_q_table.pkl"
 
+VERBOSE = False
+
 ### Constants ###
 class Locations:
     BABY_LOCATION = 4
@@ -964,9 +966,9 @@ class ExperimentRunner:
         for i in range(self.iterations):
             self.reset_env()
 
+            print(f"\n\n========== ITERATION {i+1} =========")
             if self.verbose:
                 info = self.skills_server.get_info()
-                print(f"\n\n========== ITERATION {i+1} =========")
                 print(f"Initial state: {info.state}")
                 print(f"Toys rewards: {info.toys_reward}")
 
@@ -976,8 +978,7 @@ class ExperimentRunner:
             total_reward = info.total_reward
             total_rewards.append(total_reward)
                 
-            if self.verbose:
-                print(f"========== Finished {i+1}, Total reward: {total_reward} =========\n\n")
+            print(f"========== Finished {i+1}, Total reward: {total_reward} =========\n\n")
             
             if self.learning_mode and i % self.export_rate == 0:
                 file_path = self.q_table.export(self.export_file_path)
@@ -1007,7 +1008,7 @@ def get_learning_mode_from_args() -> bool:
 def run(learning_mode, iterations=None, export_rate=None):
     skills_server = SkillsServer()
     try:
-        experimentRunner = ExperimentRunner(skills_server, import_file_path=Q_TABLE_FILE_PATH, learning_mode=learning_mode, iterations=iterations, export_rate=export_rate)
+        experimentRunner = ExperimentRunner(skills_server, import_file_path=Q_TABLE_FILE_PATH, verbose=VERBOSE, learning_mode=learning_mode, iterations=iterations, export_rate=export_rate)
         experimentRunner.run_experiment()
     finally:
         skills_server.kill()
