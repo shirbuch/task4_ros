@@ -2,7 +2,7 @@ import datetime
 import pprint
 import random
 import sys
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 import rospy
 import os
 import roslaunch
@@ -228,7 +228,7 @@ class StateAction:
     def copy(self):
         return StateAction(self.state.copy(), self.action.copy())
 
-    def is_reasonable(self):        
+    def is_reasonable(self):
         # NAVIGATE
         if self.action.is_navigation():
             ## Checks about navigations and picks left
@@ -623,8 +623,8 @@ class GeneralReq:
     pass
 
 class SkillsServer:
-    MAX_NAVIGATIONS = 8
-    MAX_PICKS = 6
+    MAX_NAVIGATIONS = State.MAX_NAVIGATIONS
+    MAX_PICKS = State.MAX_PICKS
     
     def __init__(self, verbose=False):
         self.navigations_left = SkillsServer.MAX_NAVIGATIONS
@@ -747,8 +747,9 @@ class QTable:
     q_table: Dict[StateAction, int]
 
     INIT_VALUE = 0
-    EPS = 0.1
-    ALPHA = 0.01
+    
+    eps = 0.1
+    alpha = 0.01
     GAMMA = 0.95
 
     def __init__(self, file_name=None):
@@ -855,7 +856,7 @@ class QTable:
             max_next_state_action = QTable.get_max_record_from_q_table_formated_dict(next_state_records)
             max_next_state_action_reward = max_next_state_action[1]
         
-        reward = (1 - QTable.ALPHA)*current_state_action_reward + QTable.ALPHA*(action_reward + QTable.GAMMA*max_next_state_action_reward)
+        reward = (1 - QTable.alpha)*current_state_action_reward + QTable.alpha*(action_reward + QTable.GAMMA*max_next_state_action_reward)
         self.update(state, action, reward)
     
     @staticmethod
@@ -875,7 +876,7 @@ class QTable:
             print(f"\nState: {state}\nOptions:")
             QTable.print_q_table_formated_dict(state_records, what_to_print="action_reward")
         
-        if learning_mode and random.random() < QTable.EPS:
+        if learning_mode and random.random() < QTable.eps:
             state_action, reward = random.choice(list(state_records.items()))
         else:
             state_action = QTable.get_max_record_from_q_table_formated_dict(state_records)[0]

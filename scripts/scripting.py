@@ -168,13 +168,26 @@ def check_something_on_table():
     for state_action, reward  in q_table.q_table.items():
         if state_action.state.picks_left == 0 or state_action.state.picks_left == 1 or state_action.state.picks_left == 0:
             print(f"State: {state_action.state}, Action: {state_action.action}")
- 
+
+def check_something():
+    groups_by_step = []
+    steps_options = 3
+    for i in range(steps_options):
+        groups_by_step.append([])
+    for i in range(30):
+        step = i%steps_options
+        groups_by_step[step].append(i)
+    pprint.pprint(groups_by_step)    
+
 ### Main ###
 if __name__ == "__main__":        
-    # copy_table()
+    copy_table(MOST_RECENT_Q_TABLE_FILE_NAME, "iterative_learning.pkl")
+    
     # run(learning_mode=True, iterations=100, export_rate=5)
     # print_updated_records()
 
-    check_something_on_table()
+    # check_something_on_table()
+    
+
     
     pass
