@@ -622,6 +622,7 @@ class ServerSimulator:
 class GeneralReq:
     pass
 
+# Skils Server Wrapper #
 class SkillsServer:
     MAX_NAVIGATIONS = State.MAX_NAVIGATIONS
     MAX_PICKS = State.MAX_PICKS
@@ -942,6 +943,7 @@ class ExperimentRunner:
 
             if self.learning_mode:
                 self.q_table.fit(state, action, action_reward, next_state)
+            
             if self.verbose:
                 print(f"Performed Action: {action}")
                 print(f"Action Reward: {action_reward}")
@@ -966,29 +968,27 @@ class ExperimentRunner:
 
             self.run_control()
             
-            if not self.learning_mode:
-                info = self.skills_server.get_info()
+            info = self.skills_server.get_info()
+            total_reward = info.total_reward
+            total_rewards.append(total_reward)
                 
-                total_reward = info.total_reward
-                total_rewards.append(total_reward)
-                
-                print(f"\nFinal state: {info.state}")
+            if self.verbose:
                 print(f"========== Finished {i+1}, Total reward: {total_reward} =========\n\n")
             
             if self.learning_mode and i % self.export_rate == 0:
                 file_path = self.q_table.export(self.export_file_path)
                 print(f"Re-exported table to: {file_path}")
         
-        print(f"\n\n========== Finished Experimnet =========")
+        print(f"\n\n========== Finished Experiment =========")
         if self.learning_mode:
             file_path = self.q_table.export(self.export_file_path)
             print(f"Most recent Q-table can also be found in: {file_path}")
             
             updated_records = self.q_table.get_num_updated_records()
-            print(f"Updated records: {updated_records - prev_updated_records}")
-        else:
-            average_reward = sum(total_rewards) / len(total_rewards)
-            print(f"Average reward: {average_reward}")        
+            print(f"Updated {updated_records - prev_updated_records} records.")
+
+        average_reward = sum(total_rewards) / len(total_rewards)
+        print(f"Average reward: {average_reward}")        
         print()
 
 
