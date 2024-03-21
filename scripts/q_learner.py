@@ -63,11 +63,14 @@ class Action:
         else:
             return "None"
 
+    def key(self):
+        return self.action_id
+    
     def __hash__(self):
-        return hash(self.action_id)  
+        return hash(self.key())  
     
     def __eq__(self, other):
-        return self.action_id == other.action_id
+        return self.key() == other.__hash__()
     
     def copy(self):
         return Action(self.action_id)
@@ -127,16 +130,16 @@ class State:
         return f"(Robot: {self.robot_location}, red: {self.toys_location[ToyTypes.RED]}, green: {self.toys_location[ToyTypes.GREEN]}, blue: {self.toys_location[ToyTypes.BLUE]}, black: {self.toys_location[ToyTypes.BLACK]}, navigations left: {self.navigations_left}, picks left: {self.picks_left})"
 
     def __eq__(self, other):
-        return self.robot_location == other.robot_location and \
-            self.toys_location == other.toys_location and \
-            self.navigations_left == other.navigations_left and \
-            self.picks_left == other.picks_left
+        return self.key() == other.key()
 
     def copy(self):
         return State(self.robot_location, self.toys_location.copy(), self.navigations_left, self.picks_left)
 
+    def key(self):
+        return (self.robot_location, tuple(self.toys_location.values()), self.navigations_left, self.picks_left)
+    
     def __hash__(self):
-        return hash((self.robot_location, tuple(self.toys_location.values())))
+        return hash(self.key())
     
     def get_closeby_toy(self):
         if self.robot_location == Locations.BABY_LOCATION:
@@ -211,10 +214,13 @@ class StateAction:
         self.action = action
 
     def __eq__(self, other):
-        return self.state == other.state and self.action == other.action
+        return self.__hash__() == other.__hash__()
+    
+    def key(self):
+        return (self.state.key(), self.action.key())
     
     def __hash__(self):
-        return hash((self.state, self.action))
+        return hash(self.key())
 
     def __str__(self):
         return f"{self.state}, {self.action}"
@@ -740,7 +746,7 @@ class SkillsServer:
 class QTable:
     q_table: Dict[StateAction, int]
 
-    INIT_VALUE = -100
+    INIT_VALUE = 0
     EPS = 0.1
 
     def __init__(self, file_name=None):
@@ -800,7 +806,7 @@ class QTable:
                                         for action in [Action(action_num) for action_num in Action.ALL_ACTIONS]:
                                             state_action = StateAction(state, action)
                                             if state_action.is_reasonable():
-                                                self.q_table[state_action] = QTable.INIT_VALUE # todo: update
+                                                self.update(state, action, QTable.INIT_VALUE)
     
     def get_state_records(self, state: State) -> Dict[StateAction, int]:
         state_records = {}
@@ -833,30 +839,6 @@ class QTable:
 
     def update(self, state: State, action: Action, reward: int):
         self.q_table[StateAction(state, action)] = reward
-        # state_action = StateAction(state, action)
-        
-        # todo: deleteme
-        # state_action_records_list = [state_action_record for state_action_record in self.get_state_records(state).items() if state_action_record[0].action == action]
-        # state_action_records = {}
-        # for state_action_record in state_action_records_list:
-        #     state_action_records[state_action_record[0]] = state_action_record[1]
-        
-        # do_print = state_action_records_list.__len__() > 1
-        # if do_print:
-        #     print(f"\nUpdating: {state_action}, Reward: {reward}")
-        #     QTable.print_q_table_formated_dict(state_action_records, what_to_print="all")
-        
-        # if state_action in self.q_table:
-        #     # print(f"Warning: Updating existing record in q_table: {state_action}, from: {self.q_table[state_action]} to {reward}")
-        #     del self.q_table[state_action]
-        # self.q_table[state_action] = reward
-        
-        # todo: fix this
-        # self.q_table = {k: v for k, v in self.q_table.items() if v != QTable.INIT_VALUE}
-        
-        # if do_print:
-        #     print(f"===> After:")
-        #     QTable.print_q_table_formated_dict(state_action_records, what_to_print="all")
 
     @staticmethod
     def get_max_record_from_q_table_formated_dict(state_records: dict) -> tuple:
@@ -896,25 +878,31 @@ class QTable:
         for state_action, reward in updated_records:
             num_duplicated = sum(1 for not_updated_state_action, not_updated_reward in self.q_table.items() - updated_records if state_action == not_updated_state_action)
             if num_duplicated > 0:
-                print(f"Warning: Duplicate key in q_table {num_duplicated} times! for:\n{state_action}, Rewards: {[state_record[1] for state_record in self.get_state_records(state_action.state).items() if state_record[0].action == state_action.action]}")
+                print(f"Warning: Duplicate key in q_table {num_duplicated} times! for:\n{state_action},")
+                for state_record in self.get_state_records(state_action.state).items():
+                    if state_record[0].action == state_action.action:
+                        print(f"{state_record[0].__str__()}, {state_record[0].__hash__()}")
+
                 return
 
 
 ### Experiment Runner ###
 class ExperimentRunner:
-    LEARNING_MODE_ITERATIONS = 1000  # future: update
-    EXECUTE_MODE_ITERATIONS = 10
-    MOST_RECENT_Q_TABLE_FILE_NAME = "most_recent_q_table.pkl" # future: update
+    DEFAULT_MOST_RECENT_Q_TABLE_FILE_NAME = "most_recent_q_table.pkl" # future: update
     
-    def __init__(self, skills_server: SkillsServer, learning_mode=False, import_file_name=None, export_file_name=None, export_rate=5, verbose=None): # future: change file name
-        self.skills_server = skills_server 
-        self.learning_mode = learning_mode
-        self.iterations = ExperimentRunner.LEARNING_MODE_ITERATIONS if learning_mode else ExperimentRunner.EXECUTE_MODE_ITERATIONS
+    def __init__(self, skills_server: SkillsServer, import_file_name=None, verbose=None, learning_mode=False, iterations=20, export_file_name=None, export_rate=5): # future: change file name
+        self.skills_server = skills_server
         self.q_table = QTable(import_file_name) # future: check if learning_mode means starting with empty q_table      
-        self.export_file_name = export_file_name if export_file_name else QTable.generate_file_name()
-        self.export_rate = export_rate # Export the q_table once every 'export_rate' iterations
-        self.verbose = not self.learning_mode if verbose is None else verbose
-
+        self.verbose = not learning_mode if verbose is None else verbose
+        
+        self.learning_mode = learning_mode
+        if learning_mode:
+            self.iterations = iterations if iterations is not None else ExperimentRunner.DEFAULT_LEARNING_MODE_ITERATIONS
+            self.export_file_name = export_file_name if export_file_name is not None else ExperimentRunner.DEFAULT_MOST_RECENT_Q_TABLE_FILE_NAME # backlog: check file exists
+            self.export_rate = export_rate # Export the q_table once every 'export_rate' iterations
+        else:
+            self.iterations = iterations if iterations is not None else 10
+        
     def reset_env(self):
         # Assumes skills_server is already running
         print(f"========== reset env =========")
@@ -928,7 +916,7 @@ class ExperimentRunner:
         self.skills_server.relaunch()
 
     def get_state_and_next_action(self):
-        state = self.skills_server.get_info().state        
+        state = self.skills_server.get_info().state      
         return state, self.q_table.choose_next_action(state, self.learning_mode, self.verbose)
     
     def run_control(self): 
@@ -940,7 +928,7 @@ class ExperimentRunner:
             total_reward = self.skills_server.get_info().total_reward
             action_reward = total_reward - prev_total_reward
             prev_total_reward = total_reward
-    
+
             if self.learning_mode:                
                 self.q_table.update(state, action, action_reward)
                 
@@ -986,8 +974,6 @@ class ExperimentRunner:
         # Export the final q_table
         if self.learning_mode:
             file_path = self.q_table.export(self.export_file_name)
-            print(f"Final Q-table exported to: {file_path}")
-            file_path = self.q_table.export(ExperimentRunner.MOST_RECENT_Q_TABLE_FILE_NAME)
             print(f"Most recent Q-table can also be found in: {file_path}\n\n")
 
 
@@ -1001,8 +987,9 @@ def get_learning_mode_from_args() -> bool:
 def run(learning_mode, verbose=False):
     skills_server = SkillsServer(verbose) # future: =not learning_mode
     try:
-        import_file_name = ExperimentRunner.MOST_RECENT_Q_TABLE_FILE_NAME
-        experimentRunner = ExperimentRunner(skills_server, learning_mode, import_file_name=import_file_name, export_rate=50, verbose=verbose) # future: =not learning_mode
+        # Learning mode
+        experimentRunner = ExperimentRunner(skills_server, import_file_name=ExperimentRunner.DEFAULT_MOST_RECENT_Q_TABLE_FILE_NAME, learning_mode=learning_mode, \
+            export_file_name=ExperimentRunner.DEFAULT_MOST_RECENT_Q_TABLE_FILE_NAME, verbose=verbose) # future: =not learning_mode
         experimentRunner.run_experiment()
     finally:
         skills_server.kill()
