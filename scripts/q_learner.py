@@ -18,6 +18,7 @@ Q_TABLE_FILE_PATH = "task4_env/most_recent_q_table.pkl"
 
 VERBOSE = False
 
+
 ### Constants ###
 class Locations:
     BABY_LOCATION = 4
@@ -363,7 +364,6 @@ class Info:
         return f"State: {self.state}, Toys reward: {self.toys_reward}, Log: {self.log}, Total reward: {self.total_reward}"
 
 ### Server Simulator ###
-# revert
 class ServerSimulator:
     def __init__(self):
         self.SUCCEEDED = 3
@@ -633,36 +633,40 @@ class SkillsServer:
         self.navigations_left = SkillsServer.MAX_NAVIGATIONS
         self.picks_left = SkillsServer.MAX_PICKS
         self.verbose = verbose
-        # revert   
-        # self.node = roslaunch.core.Node("task4_env", "skills_server.py", name="skills_server_node", output='log')
-        # self.launcher = roslaunch.scriptapi.ROSLaunch()
-        # self.launcher.start()
+
+        self.node = roslaunch.core.Node("task4_env", "skills_server.py", name="skills_server_node", output='log')
+        self.launcher = roslaunch.scriptapi.ROSLaunch()
+        self.launcher.start()
         self.process = None
-        self.server_simulator = ServerSimulator()
+        
+        # For server simulation usage
+        # self.server_simulator = ServerSimulator()
             
     def reset_parameters(self):
         self.navigations_left = SkillsServer.MAX_NAVIGATIONS
         self.picks_left = SkillsServer.MAX_PICKS
         
-        # revert
-        self.server_simulator.reset()
+        # For server simulation usage
+        # self.server_simulator.reset()
     
     # Operation #
     def kill(self):
-        # revert
-          # self.process.stop() if self.process else os.system("rosnode kill skills_server_node")
+        # For server simulation usage
+        self.process.stop() if self.process else os.system("rosnode kill skills_server_node")
+        
         self.process = None
     
     def launch(self):
         self.reset_parameters()
         
-        # revert
-        # self.launcher.launch(self.node)
-        # # wait for services launched in server
-        # rospy.wait_for_service('info')
-        # rospy.wait_for_service('navigate')
-        # rospy.wait_for_service('pick')
-        # rospy.wait_for_service('place')
+        # For server simulation usage
+        # Comment these out
+        self.launcher.launch(self.node)
+        # wait for services launched in server
+        rospy.wait_for_service('info')
+        rospy.wait_for_service('navigate')
+        rospy.wait_for_service('pick')
+        rospy.wait_for_service('place')
 
     def relaunch(self):
         self.kill()
@@ -703,43 +707,54 @@ class SkillsServer:
         return Info(state, toys_reward, log, total_reward)
 
     # Service Calls #
-    # revert all to call service
     def call_navigate(self, location) -> bool:
         try:
-            # navigate_srv = rospy.ServiceProxy('navigate', navigate)
-            # resp = navigate_srv(location)
-            req = GeneralReq()
-            req.location = location
-            resp = self.server_simulator.handle_navigate(req)
+            navigate_srv = rospy.ServiceProxy('navigate', navigate)
+            resp = navigate_srv(location)
+            
+            # For server simulation usage
+            # req = GeneralReq()
+            # req.location = location
+            # resp = self.server_simulator.handle_navigate(req)
+            
             return resp.success
         except rospy.ServiceException as e:
             print("Service call failed: %s"%e)
 
     def call_pick(self, toy_type) -> bool:
         try:
-            # pick_srv = rospy.ServiceProxy('pick', pick)
-            # resp = pick_srv(toy_type)
-            req = GeneralReq()
-            req.toy_type = toy_type
-            resp = self.server_simulator.handle_pick(req)            
+            pick_srv = rospy.ServiceProxy('pick', pick)
+            resp = pick_srv(toy_type)
+
+            # For server simulation usage
+            # req = GeneralReq()
+            # req.toy_type = toy_type
+            # resp = self.server_simulator.handle_pick(req)            
+            
             return resp.success
         except rospy.ServiceException as e:
             print("Service call failed: %s"%e)
 
     def call_place(self) -> bool:
         try:
-            # place_srv = rospy.ServiceProxy('place', place)
-            # resp = place_srv()
-            resp = self.server_simulator.handle_place()  
+            place_srv = rospy.ServiceProxy('place', place)
+            resp = place_srv()
+
+            # For server simulation usage
+            # resp = self.server_simulator.handle_place()  
+
             return resp.success
         except rospy.ServiceException as e:
             print("Service call failed: %s"%e)
 
     def call_info(self) -> str:
         try:
-            # info_srv = rospy.ServiceProxy('info', info)
-            # resp = info_srv()
-            resp = self.server_simulator.handle_info()  
+            info_srv = rospy.ServiceProxy('info', info)
+            resp = info_srv()
+
+            # For server simulation usage
+            # resp = self.server_simulator.handle_info()  
+
             return resp.internal_info
         except rospy.ServiceException as e:
             print("Service call failed: %s"%e)

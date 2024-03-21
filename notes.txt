@@ -1,4 +1,5 @@
 roslaunch task4_env task4_env.launch > /dev/null 2>&1
+roslaunch task4_env task4_env.launch
 python task4_env/scripts/q_learner.py 0
 python task4_env/scripts/scripting.py
 
